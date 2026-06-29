@@ -1,0 +1,80 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+export const runtime = 'nodejs'; // Use Node.js runtime for streams
+
+export async function POST(req) {
+  try {
+    const { model, messages, temperature } = await req.json();
+
+    // Check if Gemini Key is configured on the server
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      return new Response(
+        "Error: Gemini API Key is unconfigured on the server. Open your Vercel Dashboard or .env.local file and set GEMINI_API_KEY to activate live AI responses.",
+        { status: 500 }
+      );
+    }
+
+    if (!messages || messages.length === 0) {
+      return new Response("Error: Messages list cannot be empty.", { status: 400 });
+    }
+
+    // Initialize Gemini SDK
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // Default model if simulated or unmapped
+    let targetModel = model;
+    if (model.endsWith('-sim')) {
+      targetModel = 'gemini-2.5-flash';
+    }
+
+    const generativeModel = genAI.getGenerativeModel({ model: targetModel });
+
+    // Format messages for Gemini API { role: 'user' | 'model', parts: [{ text: string }] }
+    const contents = messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+
+    // Trigger content stream
+    const result = await generativeModel.generateContentStream({
+      contents,
+      generationConfig: {
+        temperature: temperature ?? 0.7,
+        maxOutputTokens: 2048,
+      }
+    });
+
+    // Construct response stream
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of result.stream) {
+            const text = chunk.text();
+            if (text) {
+              controller.enqueue(encoder.encode(text));
+            }
+          }
+        } catch (streamError) {
+          console.error("Stream generation error:", streamError);
+          controller.enqueue(encoder.encode(`\n\n*[API Streaming Error: ${streamError.message}]*`));
+        } finally {
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+        'Cache-Control': 'no-cache',
+      }
+    });
+
+  } catch (error) {
+    console.error("API Route Error:", error);
+    return new Response(`Server error processing chat request: ${error.message}`, { status: 500 });
+  }
+}

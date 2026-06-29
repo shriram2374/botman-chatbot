@@ -521,12 +521,14 @@ body {
 
 .message-wrapper {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.5rem;
   max-width: 75%;
 }
 
 .message-row.user .message-wrapper {
-  flex-direction: row-reverse;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .avatar {
@@ -538,11 +540,14 @@ body {
   justify-content: center;
   font-weight: bold;
   flex-shrink: 0;
+  margin-right: 10px;
 }
 
 .message-row.user .avatar {
   background: var(--accent-yellow);
   color: #09090e;
+  margin-right: 0;
+  margin-left: 10px;
 }
 
 .message-row.ai .avatar {
@@ -659,9 +664,10 @@ body {
   background: rgba(255, 255, 255, 0.01);
   border-left: 2px solid var(--accent-yellow);
   padding: 0.75rem 1rem;
-  border-radius: 4px 8px 8px 4px;
-  margin-bottom: 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
   font-size: 0.85rem;
+  width: 100%;
 }
 
 .reasoning-header {
@@ -673,18 +679,6 @@ body {
   color: var(--accent-yellow);
   font-weight: 600;
   font-family: var(--font-display);
-}
-
-.reasoning-toggle-icon {
-  transition: transform var(--transition-fast);
-}
-
-.reasoning-container.collapsed .reasoning-content {
-  display: none;
-}
-
-.reasoning-container.collapsed .reasoning-toggle-icon {
-  transform: rotate(-90deg);
 }
 
 .reasoning-content {
@@ -934,7 +928,8 @@ body {
 }
 
 .form-group input[type="text"],
-.form-group input[type="password"] {
+.form-group input[type="password"],
+.form-group input[type="email"] {
   width: 100%;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-glass);
