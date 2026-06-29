@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Botman — The Dark Knight of AI Assistants</title>
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Botman is a high-performance AI assistant featuring a custom Batcave theme, advanced Markdown support, persistent local history, and Gemini API integration.">
+  
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Main Container -->
+  <div class="app-container" id="app-container">
+    
+    <!-- Sidebar / Chat History Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <!-- Custom Bat-Signal SVG Icon -->
+          <svg class="sparkle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12,7.5c-0.5,0-0.9-0.4-1.2-0.8c-0.7-1.1-1.5-2.2-2.3-3.2c-0.1-0.2-0.3-0.2-0.5-0.1c-0.2,0.1-0.2,0.3-0.1,0.5c0.7,1.4,1,2.8,1,4.4c0,0.4-0.1,0.7-0.4,1c-1.8,1.8-4.2,2.5-6.7,2.2c-0.3,0-0.6,0.2-0.7,0.5c-0.1,0.3,0.1,0.6,0.3,0.7c2.5,1.2,4.8,2.7,6.7,4.8c0.2,0.2,0.4,0.3,0.7,0.3c0.7,0.1,1.1,0.7,1.5,1.2c0.7,1,1.5,1.9,2.4,2.7c0.2,0.2,0.5,0.2,0.7,0c0.9-0.8,1.7-1.7,2.4-2.7c0.4-0.5,0.8-1.1,1.5-1.2c0.3,0,0.5-0.1,0.7-0.3c1.9-2.1,4.2-3.6,6.7-4.8c0.2-0.1,0.4-0.4,0.3-0.7c-0.1-0.3-0.4-0.5-0.7-0.5c-2.5,0.3-4.9-0.4-6.7-2.2c-0.3-0.3-0.4-0.6-0.4-1c0-1.6,0.3-3,1-4.4c0.1-0.2,0-0.4-0.1-0.5c-0.2-0.1-0.4-0.1-0.5,0.1c-0.8,1-1.6,2.1-2.3,3.2C12.9,7.1,12.5,7.5,12,7.5z" fill="url(#gradient-accent)"/>
+            <defs>
+              <linearGradient id="gradient-accent" x1="2" y1="3" x2="22" y2="21" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#ffe600"/>
+                <stop offset="1" stop-color="#b58500"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span>BOTMAN</span>
+        </div>
+        <button class="new-chat-btn" id="new-chat-btn" title="Start new mission">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>New Mission</span>
+        </button>
+      </div>
+
+      <!-- Scrollable conversations list -->
+      <nav class="history-panel" id="history-panel">
+        <div class="section-title">Mission Logs</div>
+        <div class="chats-list" id="chats-list">
+          <!-- Dynamically populated chats -->
+        </div>
+      </nav>
+
+      <!-- Sidebar footer with utility buttons -->
+      <div class="sidebar-footer">
+        <button class="footer-action-btn" id="settings-btn" title="Batcomputer Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Batcomputer Link</span>
+        </button>
+        <button class="footer-action-btn delete-btn" id="clear-chats-btn" title="Purge logs">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+          <span>Purge Logs</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Chat Workspace -->
+    <main class="chat-workspace">
+      
+      <!-- Top navbar -->
+      <header class="navbar">
+        <div class="nav-left">
+          <button class="menu-toggle-btn" id="menu-toggle-btn" aria-label="Toggle Sidebar">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="chat-title" id="chat-title">New Mission</div>
+        </div>
+
+        <div class="nav-right">
+          <!-- Model Selection -->
+          <div class="model-select-wrapper">
+            <label for="model-selector" class="sr-only">Choose Batcomputer Core</label>
+            <select class="model-selector" id="model-selector">
+              <option value="gemini-2.5-flash" selected>Batcomputer Core (Flash)</option>
+              <option value="gemini-2.5-pro">Batcomputer Core (Pro)</option>
+              <option value="gemini-1.5-flash">Batcomputer Core (Legacy)</option>
+              <option value="claude-3-5-sonnet-sim">Alfred-3.5 (Simulated)</option>
+              <option value="gpt-4o-sim">Oracle-4o (Simulated)</option>
+            </select>
+          </div>
+          <!-- Status indicator -->
+          <div class="status-indicator ready" id="status-indicator">
+            <span class="pulse-dot"></span>
+            <span class="status-text" id="status-text">Online</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Message Area -->
+      <div class="messages-container" id="messages-container">
+        
+        <!-- Welcome Screen (Shown when active chat has no messages) -->
+        <div class="welcome-screen" id="welcome-screen">
+          <div class="welcome-header">
+            <h1 class="gradient-text">I am Botman. I stand watch.</h1>
+            <p class="subtitle">Secure uplink active. How can I assist you with your mission tonight?</p>
+          </div>
+
+          <div class="suggestion-grid">
+            <button class="suggestion-card" data-prompt="Help me write a Python script to scan the Gotham harbor surveillance cameras.">
+              <span class="card-icon">🦇</span>
+              <span class="card-title">Scan Gotham harbor</span>
+              <span class="card-description">Write surveillance python script</span>
+            </button>
+            <button class="suggestion-card" data-prompt="Compare Batcomputer security database schemas: SQL relational integrity vs NoSQL decentralization.">
+              <span class="card-icon">🛡️</span>
+              <span class="card-title">Compare security schemas</span>
+              <span class="card-description">SQL vs NoSQL integrity check</span>
+            </button>
+            <button class="suggestion-card" data-prompt="Brainstorm 5 tactical gadget ideas to assist search and rescue teams in dark locations.">
+              <span class="card-icon">⚡</span>
+              <span class="card-title">Tactical Gadget Ideas</span>
+              <span class="card-description">Brainstorming search equipment</span>
+            </button>
+            <button class="suggestion-card" data-prompt="Write a CSS glowing neon Bat-Signal animation styling with backdrop filters.">
+              <span class="card-icon">🌕</span>
+              <span class="card-title">CSS Bat-Signal Animation</span>
+              <span class="card-description">Create neon glowing styles</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat messages will be injected here -->
+      </div>
+
+      <!-- Input Section at the Bottom -->
+      <footer class="input-panel">
+        <div class="input-container">
+          <div class="textarea-wrapper">
+            <textarea class="chat-input" id="chat-input" placeholder="Initiate query..." rows="1" maxlength="4000"></textarea>
+          </div>
+          <div class="input-actions">
+            <div class="char-counter" id="char-counter">0 / 4000</div>
+            <div class="btn-group">
+              <button class="stop-btn hidden" id="stop-btn" title="Abort generation">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                </svg>
+              </button>
+              <button class="send-btn" id="send-btn" title="Send query" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="legal-notice">Botman network secure. All logs are stored strictly on local device storage.</div>
+      </footer>
+
+    </main>
+  </div>
+
+  <!-- Settings Modal (Glassmorphism design overlay) -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Batcomputer Settings</h2>
+        <button class="close-modal-btn" id="close-modal-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="info-alert">
+          <svg class="alert-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <div class="alert-text">
+            Enter your <strong>Gemini API Key</strong> to connect directly to the Google LLM nodes. Leaving this blank routes queries to simulated offline protocols.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="api-key-input">Gemini API Key</label>
+          <div class="input-password-wrapper">
+            <input type="password" id="api-key-input" placeholder="AIzaSy..." autocomplete="off">
+            <button class="toggle-password-btn" id="toggle-password-btn" type="button">Show</button>
+          </div>
+          <span class="field-help">Keys are saved locally in the Batcomputer logs. Acquire a token key from <a href="https://aistudio.google.com/" target="_blank" rel="noopener">Google AI Studio</a>.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="temperature-input">Variance Temperature: <span id="temp-val">0.7</span></label>
+          <input type="range" id="temperature-input" min="0" max="2" step="0.1" value="0.7">
+          <span class="field-help">Higher variance allows for wider, creative calculation pathways.</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-settings-btn">Cancel</button>
+        <button class="btn btn-primary" id="save-settings-btn">Secure Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript File -->
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
