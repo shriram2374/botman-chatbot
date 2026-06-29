@@ -58,3 +58,5 @@ Since this is a standard Next.js App Router application, deploying to Vercel is 
    * `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    * `GEMINI_API_KEY`
 4. Click **Deploy**. Vercel will build and launch your full-stack app!
+
+<!-- trigger rebuild: 1 -->

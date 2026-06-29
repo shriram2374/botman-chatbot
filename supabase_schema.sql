@@ -1,11 +1,3 @@
--- ==========================================
--- BOTMAN — SUPABASE DATABASE SCHEMA SCRIPT
--- Copy-paste this script into the Supabase SQL Editor to set up your tables and policies.
--- ==========================================
-
--- Enable Row Level Security (RLS) policies on tables
-
--- 1. PROFILES TABLE (Associated with Supabase Auth Users)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
     username TEXT NOT NULL,
@@ -14,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- 2. CHATS TABLE (Conversation logs index)
+
 CREATE TABLE IF NOT EXISTS public.chats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -25,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.chats (
 
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
 
--- 3. MESSAGES TABLE (Individual message bubbles)
+
 CREATE TABLE IF NOT EXISTS public.messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_id UUID NOT NULL REFERENCES public.chats(id) ON DELETE CASCADE,
@@ -38,10 +30,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 
--- ==========================================
--- ROW LEVEL SECURITY (RLS) POLICIES
--- Ensures users can only access their own private data
--- ==========================================
+
 
 -- Profiles policies
 CREATE POLICY "Users can view their own profile" 
@@ -91,10 +80,7 @@ USING (
 );
 
 
--- ==========================================
--- AUTHENTICATION TRIGGERS
--- Automatically create profile row when user signs up
--- ==========================================
+
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
@@ -108,7 +94,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Bind trigger to auth.users insertions
+
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
