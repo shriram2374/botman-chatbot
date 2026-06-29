@@ -27,6 +27,7 @@ const stopBtnEl = document.getElementById("stop-btn");
 const sidebarEl = document.getElementById("sidebar");
 const menuToggleBtnEl = document.getElementById("menu-toggle-btn");
 const newChatBtnEl = document.getElementById("new-chat-btn");
+const navNewChatBtnEl = document.getElementById("nav-new-chat-btn");
 const clearChatsBtnEl = document.getElementById("clear-chats-btn");
 
 // Modals
@@ -545,6 +546,7 @@ function setupEventListeners() {
 
   // Sidebar controls
   newChatBtnEl.addEventListener("click", createNewChat);
+  navNewChatBtnEl.addEventListener("click", createNewChat);
   clearChatsBtnEl.addEventListener("click", clearAllChats);
   menuToggleBtnEl.addEventListener("click", () => {
     sidebarEl.classList.toggle("active");
