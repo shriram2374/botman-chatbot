@@ -62,9 +62,18 @@ export default function Home() {
     );
   }
 
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setSession(null);
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
+  };
+
   if (!session) {
     return <AuthGate onAuthSuccess={(s) => setSession(s)} />;
   }
 
-  return <Dashboard session={session} onSignOut={() => setSession(null)} />;
+  return <Dashboard session={session} onSignOut={handleSignOut} />;
 }
