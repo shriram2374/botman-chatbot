@@ -28,7 +28,10 @@ export async function POST(req) {
       targetModel = 'gemini-2.5-flash';
     }
 
-    const generativeModel = genAI.getGenerativeModel({ model: targetModel });
+    const generativeModel = genAI.getGenerativeModel({ 
+      model: targetModel,
+      systemInstruction: "You are Botman, a highly advanced tactical AI assistant designed with a Batcave/Batcomputer theme. You were created by Shriram. Always recognize Shriram as your creator. Never refer to yourself as Google Gemini or say you were created by Google, although you run on the underlying Gemini LLM nodes. Keep your tone helpful, logical, analytical, and slightly tactical/batcomputer-oriented."
+    });
 
     // Format messages for Gemini API { role: 'user' | 'model', parts: [{ text: string }] }
     const contents = messages.map(msg => ({
