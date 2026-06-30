@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
     username TEXT NOT NULL,
+    nickname TEXT,
+    system_prompt TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -99,3 +101,7 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Database Migrations for existing deployments:
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS nickname TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS system_prompt TEXT;

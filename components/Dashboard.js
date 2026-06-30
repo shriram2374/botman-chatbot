@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { playSwoosh, playChirp } from '@/lib/audio';
 
 export default function Dashboard({ session, onSignOut }) {
   // Application State
@@ -13,6 +14,12 @@ export default function Dashboard({ session, onSignOut }) {
   const [settingsActive, setSettingsActive] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
 
+  // Search & Profile Customizations
+  const [searchQuery, setSearchQuery] = useState('');
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [speakingMessageId, setSpeakingMessageId] = useState(null);
+  const [profile, setProfile] = useState({ nickname: '', system_prompt: '' });
+
   // Streaming State (For real-time UI accumulation)
   const [streamContent, setStreamContent] = useState('');
   const [streamThinking, setStreamThinking] = useState('');
@@ -23,11 +30,32 @@ export default function Dashboard({ session, onSignOut }) {
   const abortControllerRef = useRef(null);
 
   const currentUser = session?.user;
-  const username = currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'Agent';
+  const username = currentUser?.email?.split('@')[0] || 'Agent';
+  const displayName = profile.nickname || username;
 
   // ----------------------------------------------------
   // Database Synchronization Operations
   // ----------------------------------------------------
+
+  const fetchProfile = async () => {
+    if (!currentUser?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data) {
+        setProfile({
+          nickname: data.nickname || '',
+          system_prompt: data.system_prompt || ''
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching profile details:", err);
+    }
+  };
 
   const fetchChats = async () => {
     try {
@@ -60,26 +88,24 @@ export default function Dashboard({ session, onSignOut }) {
     }
   };
 
-  // On mount: Fetch chats list and auto-select
+  // On mount: Fetch profile metadata, chats list and auto-select
   useEffect(() => {
-    const initChats = async () => {
+    const initData = async () => {
+      await fetchProfile();
       const chatList = await fetchChats();
       if (chatList && chatList.length > 0) {
-        // Load the first chat
         setActiveChatId(chatList[0].id);
       } else {
-        // Create initial chat
         await handleCreateChat();
       }
     };
-    initChats();
+    initData();
   }, []);
 
   // Whenever active chat changes: Load its messages
   useEffect(() => {
     if (activeChatId) {
       fetchMessages(activeChatId);
-      // Sync model select configuration
       const activeChat = chats.find(c => c.id === activeChatId);
       if (activeChat) {
         setModel(activeChat.model || 'gemini-2.5-flash');
@@ -89,6 +115,11 @@ export default function Dashboard({ session, onSignOut }) {
     }
     setStreamContent('');
     setStreamThinking('');
+    // Stop any speaking speech synthesis on chat swap
+    if (typeof window !== 'undefined') {
+      window.speechSynthesis?.cancel();
+      setSpeakingMessageId(null);
+    }
   }, [activeChatId]);
 
   // Auto scroll to bottom when messages or active streams update
@@ -103,6 +134,47 @@ export default function Dashboard({ session, onSignOut }) {
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [inputText]);
+
+  // ----------------------------------------------------
+  // Profile Configuration & Actions
+  // ----------------------------------------------------
+
+  const handleSaveProfile = async () => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          nickname: profile.nickname,
+          system_prompt: profile.system_prompt
+        })
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+      setSettingsActive(false);
+      if (soundEnabled) playChirp();
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      alert("Failed to update profile settings: " + err.message);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!confirm("CRITICAL WARNING: This will permanently delete your user profile and purge all messages from the database. This action is irreversible. Proceed?")) return;
+    try {
+      // ON DELETE CASCADE in Supabase schema will automatically delete profiles, chats, and messages
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+      await supabase.auth.signOut();
+      onSignOut();
+    } catch (err) {
+      console.error("Error deleting account:", err);
+      alert("Failed to delete account: " + err.message);
+    }
+  };
 
   // ----------------------------------------------------
   // Chat Actions
@@ -151,7 +223,6 @@ export default function Dashboard({ session, onSignOut }) {
           setActiveChatId(remainingChats[0].id);
         } else {
           setActiveChatId(null);
-          // Auto create a new empty chat
           await handleCreateChat();
         }
       }
@@ -206,6 +277,9 @@ export default function Dashboard({ session, onSignOut }) {
     setStreamContent('');
     setStreamThinking('');
 
+    // Trigger Batcave sound effect
+    if (soundEnabled) playSwoosh();
+
     // Abort controller for cancellation hooks
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -231,8 +305,6 @@ export default function Dashboard({ session, onSignOut }) {
         .select();
 
       if (userMsgErr) throw userMsgErr;
-      
-      // Update UI state instantly with new user bubble
       setMessages(prev => [...prev, userMsg[0]]);
 
       // Auto rename chat title if it's the first message
@@ -254,14 +326,12 @@ export default function Dashboard({ session, onSignOut }) {
         { role: 'user', content: textToSend }
       ];
 
-      // Prepare simulated thinking logs before streaming live answers (if mock core selected)
+      // Prepare simulated thinking logs before streaming live answers
       let simulated = chatModel.endsWith('-sim');
       if (simulated) {
-        // Trigger simulated responder local delay steps
         const thinkingSteps = [
           "Accessing Batcomputer database...",
           "Decrypting regional security feeds...",
-          "Synthesizing response protocols...",
           "Routing signal via Wayne Enterprises satellites...",
           "Uplink active. Stream initiation authorized."
         ];
@@ -271,7 +341,7 @@ export default function Dashboard({ session, onSignOut }) {
           if (controller.signal.aborted) throw new Error("Stopped");
           accumThinking += (i > 0 ? "\n" : "") + "▸ " + thinkingSteps[i];
           setStreamThinking(accumThinking);
-          await new Promise(r => setTimeout(r, 400));
+          await new Promise(r => setTimeout(r, 300));
         }
       }
 
@@ -281,7 +351,8 @@ export default function Dashboard({ session, onSignOut }) {
         body: JSON.stringify({
           model: chatModel,
           messages: requestMessages,
-          temperature: temperature
+          temperature: temperature,
+          customSystemPrompt: profile.system_prompt // Send custom system instructions override
         }),
         signal: controller.signal
       });
@@ -291,7 +362,6 @@ export default function Dashboard({ session, onSignOut }) {
         throw new Error(errorText || `API status code ${response.status}`);
       }
 
-      // Read Web Readable Stream from backend
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let accumContent = "";
@@ -305,7 +375,7 @@ export default function Dashboard({ session, onSignOut }) {
         setStreamContent(accumContent);
       }
 
-      // 3. Save Assistant Message (and accumulated stream payload) to Cloud Database
+      // 3. Save Assistant Message to Cloud Database
       const assistantMsgData = {
         chat_id: activeChatId,
         role: 'assistant',
@@ -319,16 +389,16 @@ export default function Dashboard({ session, onSignOut }) {
         .select();
 
       if (aiMsgErr) throw aiMsgErr;
-      
-      // Merge final response into react state lists
       setMessages(prev => [...prev, aiMsg[0]]);
+
+      // Play completion beep
+      if (soundEnabled) playChirp();
 
     } catch (err) {
       if (err.name === 'AbortError' || err.message === 'Stopped') {
         const cancelMsg = "\n\n*[Uplink transmission terminated by user]*";
         setStreamContent(prev => prev + cancelMsg);
         
-        // Write stopped content to DB
         const assistantMsgData = {
           chat_id: activeChatId,
           role: 'assistant',
@@ -370,7 +440,51 @@ export default function Dashboard({ session, onSignOut }) {
   };
 
   // ----------------------------------------------------
-  // Markdown & Code Copying Renderers
+  // Text-To-Speech Output Controller
+  // ----------------------------------------------------
+
+  const handleToggleSpeech = (msg) => {
+    if (typeof window === 'undefined') return;
+
+    if (speakingMessageId === msg.id) {
+      window.speechSynthesis?.cancel();
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    // Cancel currently speaking instances
+    window.speechSynthesis?.cancel();
+
+    // Clean up code blocks and markdown symbols before speaking
+    const textToRead = msg.content
+      .replace(/```[\s\S]*?```/g, '[code block omitted]')
+      .replace(/[*#_~`>\[\]\(\)]/g, '')
+      .trim();
+
+    if (!textToRead) return;
+
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    const voices = window.speechSynthesis?.getVoices() || [];
+    
+    // Select low-pitch English/Male or computer voice if possible
+    const tacticalVoice = voices.find(v => 
+      v.lang.startsWith('en') && 
+      (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('microsoft david') || v.name.toLowerCase().includes('natural'))
+    );
+    
+    if (tacticalVoice) utterance.voice = tacticalVoice;
+    utterance.pitch = 0.85; // Low-pitch tactical/batcomputer sound
+    utterance.rate = 0.95;  // Slightly slower pacing
+
+    utterance.onend = () => setSpeakingMessageId(null);
+    utterance.onerror = () => setSpeakingMessageId(null);
+
+    setSpeakingMessageId(msg.id);
+    window.speechSynthesis?.speak(utterance);
+  };
+
+  // ----------------------------------------------------
+  // Markdown rendering engine
   // ----------------------------------------------------
 
   const copyToClipboard = (text, e) => {
@@ -393,7 +507,6 @@ export default function Dashboard({ session, onSignOut }) {
     
     return parts.map((part, idx) => {
       if (idx % 2 === 1) {
-        // Inside Code Block
         const block = part;
         const newlineIdx = block.indexOf("\n");
         let lang = "code";
@@ -418,7 +531,6 @@ export default function Dashboard({ session, onSignOut }) {
           </div>
         );
       } else {
-        // Normal text block
         const paragraphs = part.split('\n');
         let inList = false;
         let listItems = [];
@@ -430,8 +542,6 @@ export default function Dashboard({ session, onSignOut }) {
           if (listMatch) {
             inList = true;
             listItems.push(listMatch[1]);
-            
-            // Check if next line is not a list item to render the full list
             const nextLine = paragraphs[lineIdx + 1]?.trim() || '';
             const nextIsList = nextLine.startsWith('-') || nextLine.startsWith('*');
             
@@ -452,8 +562,6 @@ export default function Dashboard({ session, onSignOut }) {
 
           if (inList) return null;
           
-          // Simple bold **text** replacement
-          // React element splitting is safer than dangerousInnerHtml for bold nodes
           const boldParts = line.split(/\*\*([^*]+)\*\*/g);
           const hasBold = boldParts.length > 1;
 
@@ -479,26 +587,31 @@ export default function Dashboard({ session, onSignOut }) {
     handleSendMessage(prompt);
   };
 
+  // Filter chats by search query input
+  const filteredChats = chats.filter(chat => 
+    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="app-container" id="app-container">
       
       {/* Sidebar navigation */}
       <aside className={`sidebar ${sidebarActive ? 'active' : ''}`} id="sidebar">
-        <div class="sidebar-header">
-          <div class="logo">
-            <svg class="sparkle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div className="sidebar-header">
+          <div className="logo">
+            <svg className="sparkle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12,7.5c-0.5,0-0.9-0.4-1.2-0.8c-0.7-1.1-1.5-2.2-2.3-3.2c-0.1-0.2-0.3-0.2-0.5-0.1c-0.2,0.1-0.2,0.3-0.1,0.5c0.7,1.4,1,2.8,1,4.4c0,0.4-0.1,0.7-0.4,1c-1.8,1.8-4.2,2.5-6.7,2.2c-0.3,0-0.6,0.2-0.7,0.5c-0.1,0.3,0.1,0.6,0.3,0.7c2.5,1.2,4.8,2.7,6.7,4.8c0.2,0.2,0.4,0.3,0.7,0.3c0.7,0.1,1.1,0.7,1.5,1.2c0.7,1,1.5,1.9,2.4,2.7c0.2,0.2,0.5,0.2,0.7,0c0.9-0.8,1.7-1.7,2.4-2.7c0.4-0.5,0.8-1.1,1.5-1.2c0.3,0,0.5-0.1,0.7-0.3c1.9-2.1,4.2-3.6,6.7-4.8c0.2-0.1,0.4-0.4,0.3-0.7c-0.1-0.3-0.4-0.5-0.7-0.5c-2.5,0.3-4.9-0.4-6.7-2.2c-0.3-0.3-0.4-0.6-0.4-1c0-1.6,0.3-3,1-4.4c0.1-0.2,0-0.4-0.1-0.5c-0.2-0.1-0.4-0.1-0.5,0.1c-0.8,1-1.6,2.1-2.3,3.2C12.9,7.1,12.5,7.5,12,7.5z" fill="url(#gradient-accent-sidebar)"/>
               <defs>
                 <linearGradient id="gradient-accent-sidebar" x1="2" y1="3" x2="22" y2="21" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#ffe600"/>
-                  <stop offset="1" stop-color="#b58500"/>
+                  <stop stopColor="#ffe600"/>
+                  <stop offset="1" stopColor="#b58500"/>
                 </linearGradient>
               </defs>
             </svg>
             <span>BOTMAN</span>
           </div>
           <button className="new-chat-btn" onClick={handleCreateChat} title="Start new mission">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
@@ -506,48 +619,109 @@ export default function Dashboard({ session, onSignOut }) {
           </button>
         </div>
 
-        <nav class="history-panel" id="history-panel">
-          <div class="section-title">Mission Logs</div>
-          <div class="chats-list" id="chats-list">
-            {chats.map(chat => (
-              <div
-                key={chat.id}
-                className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
-                onClick={() => setActiveChatId(chat.id)}
+        {/* Search Mission Logs Filter */}
+        <div style={{ padding: '0 0.75rem', marginBottom: '0.5rem' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Search logs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-glass)',
+                borderRadius: '8px',
+                padding: '0.4rem 0.6rem 0.4rem 1.8rem',
+                fontSize: '0.8rem',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                fontFamily: 'var(--font-sans)',
+                transition: 'border-color 0.2s'
+              }}
+            />
+            <svg 
+              width="12" 
+              height="12" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="var(--text-secondary)" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              style={{ position: 'absolute', left: '0.6rem', pointerEvents: 'none' }}
+            >
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '0.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: '0.85rem'
+                }}
               >
-                <div class="chat-item-left">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                  </svg>
-                  <span class="chat-item-title">{chat.title}</span>
-                </div>
-                <div class="chat-item-actions">
-                  <button className="chat-action-btn" title="Delete conversation" onClick={(e) => handleDeleteChat(chat.id, e)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                  </button>
-                </div>
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+
+        <nav className="history-panel" id="history-panel">
+          <div className="section-title">Mission Logs</div>
+          <div className="chats-list" id="chats-list">
+            {filteredChats.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                No records found
               </div>
-            ))}
+            ) : (
+              filteredChats.map(chat => (
+                <div
+                  key={chat.id}
+                  className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
+                  onClick={() => setActiveChatId(chat.id)}
+                >
+                  <div className="chat-item-left">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span className="chat-item-title">{chat.title}</span>
+                  </div>
+                  <div className="chat-item-actions">
+                    <button className="chat-action-btn" title="Delete conversation" onClick={(e) => handleDeleteChat(chat.id, e)}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </nav>
 
-        <div class="sidebar-footer">
+        <div className="sidebar-footer">
           <div style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', color: 'var(--accent-yellow)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>👤 {username}</span>
+            <span>👤 {displayName}</span>
             <span style={{ cursor: 'pointer', opacity: 0.8 }} onClick={onSignOut} title="Sign Out">Sign Out 🚪</span>
           </div>
-          <button class="footer-action-btn" id="settings-btn" onClick={() => setSettingsActive(true)} title="Batcomputer Parameters">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button className="footer-action-btn" id="settings-btn" onClick={() => setSettingsActive(true)} title="Batcomputer Parameters">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
             <span>Batcomputer Settings</span>
           </button>
-          <button class="footer-action-btn delete-btn" id="clear-chats-btn" onClick={handleClearAllChats} title="Purge database logs">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button className="footer-action-btn delete-btn" id="clear-chats-btn" onClick={handleClearAllChats} title="Purge database logs">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               <line x1="10" y1="11" x2="10" y2="17"></line>
@@ -559,25 +733,25 @@ export default function Dashboard({ session, onSignOut }) {
       </aside>
 
       {/* Main workspace */}
-      <main class="chat-workspace">
+      <main className="chat-workspace">
         
-        <header class="navbar">
-          <div class="nav-left">
-            <button class="menu-toggle-btn" onClick={() => setSidebarActive(!sidebarActive)} aria-label="Toggle Sidebar">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <header className="navbar">
+          <div className="nav-left">
+            <button className="menu-toggle-btn" onClick={() => setSidebarActive(!sidebarActive)} aria-label="Toggle Sidebar">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="3" y1="12" x2="21" y2="12"></line>
                 <line x1="3" y1="6" x2="21" y2="6"></line>
                 <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
             </button>
-            <div class="chat-title" id="chat-title">
+            <div className="chat-title" id="chat-title">
               {chats.find(c => c.id === activeChatId)?.title || 'New Mission'}
             </div>
           </div>
 
-          <div class="nav-right">
-            <div class="model-select-wrapper">
-              <select class="model-selector" value={model} onChange={handleModelChange}>
+          <div className="nav-right">
+            <div className="model-select-wrapper">
+              <select className="model-selector" value={model} onChange={handleModelChange}>
                 <option value="gemini-2.5-flash">Batcomputer Core (Flash)</option>
                 <option value="gemini-2.5-pro">Batcomputer Core (Pro)</option>
                 <option value="gemini-1.5-flash">Batcomputer Core (Legacy)</option>
@@ -585,13 +759,12 @@ export default function Dashboard({ session, onSignOut }) {
                 <option value="gpt-4o-sim">Oracle-4o (Simulated)</option>
               </select>
             </div>
-            <div class={`status-indicator ${isGenerating ? 'working' : 'ready'}`}>
-              <span class="pulse-dot"></span>
-              <span class="status-text">{isGenerating ? 'Processing...' : 'Online'}</span>
+            <div className={`status-indicator ${isGenerating ? 'working' : 'ready'}`}>
+              <span className="pulse-dot"></span>
+              <span className="status-text">{isGenerating ? 'Processing...' : 'Online'}</span>
             </div>
-            {/* Quick-action New Chat Shortcut for Mobile */}
             <button className="nav-new-chat-btn" onClick={handleCreateChat} title="Start new mission">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
@@ -600,35 +773,35 @@ export default function Dashboard({ session, onSignOut }) {
         </header>
 
         {/* Message Container Area */}
-        <div class="messages-container" id="messages-container">
+        <div className="messages-container" id="messages-container">
           
           {messages.length === 0 && !streamContent && !streamThinking && (
-            <div class="welcome-screen" id="welcome-screen">
-              <div class="welcome-header">
-                <h1 class="gradient-text">I am Botman. I stand watch.</h1>
-                <p class="subtitle">Secure cloud uplink active. How can I assist you with your mission tonight?</p>
+            <div className="welcome-screen" id="welcome-screen">
+              <div className="welcome-header">
+                <h1 className="gradient-text">I am Botman. I stand watch.</h1>
+                <p className="subtitle">Uplink established, {displayName}. Configure settings to alter my persona, or initiate queries below.</p>
               </div>
 
-              <div class="suggestion-grid">
-                <button class="suggestion-card" onClick={() => handleSuggestionClick("Help me write a Python script to scan the Gotham harbor surveillance cameras.")}>
-                  <span class="card-icon">🦇</span>
-                  <span class="card-title">Scan Gotham harbor</span>
-                  <span class="card-description">Write surveillance python script</span>
+              <div className="suggestion-grid">
+                <button className="suggestion-card" onClick={() => handleSuggestionClick("Help me write a Python script to scan the Gotham harbor surveillance cameras.")}>
+                  <span className="card-icon">🦇</span>
+                  <span className="card-title">Scan Gotham harbor</span>
+                  <span className="card-description">Write surveillance python script</span>
                 </button>
-                <button class="suggestion-card" onClick={() => handleSuggestionClick("Compare Batcomputer security database schemas: SQL relational integrity vs NoSQL decentralization.")}>
-                  <span class="card-icon">🛡️</span>
-                  <span class="card-title">Compare security schemas</span>
-                  <span class="card-description">SQL vs NoSQL integrity check</span>
+                <button className="suggestion-card" onClick={() => handleSuggestionClick("Compare Batcomputer security database schemas: SQL relational integrity vs NoSQL decentralization.")}>
+                  <span className="card-icon">🛡️</span>
+                  <span className="card-title">Compare security schemas</span>
+                  <span className="card-description">SQL vs NoSQL integrity check</span>
                 </button>
-                <button class="suggestion-card" onClick={() => handleSuggestionClick("Brainstorm 5 tactical gadget ideas to assist search and rescue teams in dark locations.")}>
-                  <span class="card-icon">⚡</span>
-                  <span class="card-title">Tactical Gadget Ideas</span>
-                  <span class="card-description">Brainstorming search equipment</span>
+                <button className="suggestion-card" onClick={() => handleSuggestionClick("Brainstorm 5 tactical gadget ideas to assist search and rescue teams in dark locations.")}>
+                  <span className="card-icon">⚡</span>
+                  <span className="card-title">Tactical Gadget Ideas</span>
+                  <span className="card-description">Brainstorming search equipment</span>
                 </button>
-                <button class="suggestion-card" onClick={() => handleSuggestionClick("Write a CSS glowing neon Bat-Signal animation styling with backdrop filters.")}>
-                  <span class="card-icon">🌕</span>
-                  <span class="card-title">CSS Bat-Signal Animation</span>
-                  <span class="card-description">Create neon glowing styles</span>
+                <button className="suggestion-card" onClick={() => handleSuggestionClick("Write a CSS glowing neon Bat-Signal animation styling with backdrop filters.")}>
+                  <span className="card-icon">🌕</span>
+                  <span className="card-title">CSS Bat-Signal Animation</span>
+                  <span className="card-description">Create neon glowing styles</span>
                 </button>
               </div>
             </div>
@@ -639,9 +812,9 @@ export default function Dashboard({ session, onSignOut }) {
             <div key={msg.id} className={`message-row ${msg.role === 'user' ? 'user' : 'ai'}`}>
               <div className="avatar">
                 {msg.role === 'user' ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 )}
               </div>
               <div className="message-wrapper">
@@ -655,6 +828,36 @@ export default function Dashboard({ session, onSignOut }) {
                 )}
                 <div className="bubble">
                   {renderFormattedMarkdown(msg.content)}
+                  {msg.role === 'assistant' && (
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', justifyContent: 'flex-end' }}>
+                      {/* Text To Speech Control */}
+                      <button 
+                        onClick={() => handleToggleSpeech(msg)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: speakingMessageId === msg.id ? 'var(--accent-yellow)' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          fontSize: '0.7rem',
+                          padding: '0.2rem'
+                        }}
+                        title={speakingMessageId === msg.id ? "Stop voice" : "Read response"}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                          {speakingMessageId === msg.id ? (
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                          ) : (
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                          )}
+                        </svg>
+                        <span>{speakingMessageId === msg.id ? "Silence" : "Speak"}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -664,7 +867,7 @@ export default function Dashboard({ session, onSignOut }) {
           {(streamThinking || streamContent) && (
             <div className="message-row ai">
               <div className="avatar">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
               </div>
               <div className="message-wrapper">
                 {streamThinking && (
@@ -688,15 +891,15 @@ export default function Dashboard({ session, onSignOut }) {
         </div>
 
         {/* Input Bar Panel */}
-        <footer class="input-panel">
-          <div class="input-container">
-            <div class="textarea-wrapper">
+        <footer className="input-panel">
+          <div className="input-container">
+            <div className="textarea-wrapper">
               <textarea
                 ref={textareaRef}
-                class="chat-input"
+                className="chat-input"
                 placeholder="Initiate query..."
                 rows="1"
-                maxlength="4000"
+                maxLength="4000"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
@@ -707,12 +910,12 @@ export default function Dashboard({ session, onSignOut }) {
                 }}
               />
             </div>
-            <div class="input-actions">
-              <div class="char-counter">{inputText.length} / 4000</div>
-              <div class="btn-group">
+            <div className="input-actions">
+              <div className="char-counter">{inputText.length} / 4000</div>
+              <div className="btn-group">
                 {isGenerating && (
                   <button className="stop-btn" onClick={handleStopGeneration} title="Abort generation">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
                     </svg>
                   </button>
@@ -723,7 +926,7 @@ export default function Dashboard({ session, onSignOut }) {
                   disabled={inputText.trim().length === 0 || isGenerating}
                   title="Send query"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"></line>
                     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                   </svg>
@@ -731,53 +934,146 @@ export default function Dashboard({ session, onSignOut }) {
               </div>
             </div>
           </div>
-          <div class="legal-notice">Botman network secure. All logs are synced to your private Supabase cloud database.</div>
+          <div className="legal-notice">Botman network secure. All logs are synced to your private Supabase cloud database.</div>
         </footer>
       </main>
 
-      {/* Model Parameter Settings Overlay */}
+      {/* Model Parameter & Profile Settings Overlay */}
       {settingsActive && (
         <div className="modal-overlay active">
-          <div className="modal">
+          <div className="modal" style={{ maxWidth: '500px' }}>
             <div className="modal-header">
-              <h2>Batcomputer settings</h2>
+              <h2>Batcomputer Uplink Settings</h2>
               <button className="close-modal-btn" onClick={() => setSettingsActive(false)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
               </button>
             </div>
             
-            <div className="modal-body">
-              <div className="info-alert">
-                <svg className="alert-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="16" x2="12" y2="12"></line>
-                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-                <div className="alert-text">
-                  Your private <strong>Gemini API Key</strong> is now securely hosted on the server. Adjust generation variance (creativity) thresholds below.
+            <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto', paddingRight: '5px' }}>
+              
+              {/* Profile Config section */}
+              <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '0.9rem', color: 'var(--accent-yellow)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Agent Credentials</h3>
+                
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Code Alias (Nickname)</label>
+                  <input
+                    type="text"
+                    value={profile.nickname}
+                    onChange={(e) => setProfile(prev => ({ ...prev, nickname: e.target.value }))}
+                    placeholder={username}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-glass)',
+                      borderRadius: '8px',
+                      padding: '0.5rem',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      fontFamily: 'var(--font-sans)'
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Custom System Directives (AI Persona)</label>
+                  <textarea
+                    rows="3"
+                    value={profile.system_prompt}
+                    onChange={(e) => setProfile(prev => ({ ...prev, system_prompt: e.target.value }))}
+                    placeholder="e.g. Speak only in Spanish, or: Answer like a senior database engineer"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-glass)',
+                      borderRadius: '8px',
+                      padding: '0.5rem',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      fontFamily: 'var(--font-sans)',
+                      resize: 'vertical'
+                    }}
+                  />
+                  <span className="field-help" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>These instructions override Botman's conversational protocols.</span>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Creativity Variance (Temperature): {temperature}</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={temperature}
-                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                  style={{ width: '100%' }}
-                />
-                <span className="field-help">Higher thresholds force wide, experimental calculation streams.</span>
+              {/* Preferences Section */}
+              <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '0.9rem', color: 'var(--accent-yellow)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Audio Controls</h3>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="sound-fx-checkbox"
+                    checked={soundEnabled}
+                    onChange={(e) => setSoundEnabled(e.target.checked)}
+                    style={{ cursor: 'pointer', accentColor: 'var(--accent-yellow)' }}
+                  />
+                  <label htmlFor="sound-fx-checkbox" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                    Enable Batcave Sound Effects (Swooshes & Bleeps)
+                  </label>
+                </div>
               </div>
+
+              {/* Model Parameter section */}
+              <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '0.9rem', color: 'var(--accent-yellow)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Model Tuning</h3>
+                
+                <div className="form-group">
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Creativity Variance (Temperature): {temperature}</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                    style={{ width: '100%', accentColor: 'var(--accent-yellow)' }}
+                  />
+                  <span className="field-help" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Higher values unlock wider, more experimental calculation streams.</span>
+                </div>
+              </div>
+
+              {/* Danger Zone */}
+              <div>
+                <h3 style={{ fontSize: '0.9rem', color: '#ff3333', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Danger Zone</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,51,51,0.03)', border: '1px dashed rgba(255,51,51,0.3)', padding: '0.75rem', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>Decommission Access Node</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Wipe profile metadata and delete all chat transcripts forever.</div>
+                  </div>
+                  <button 
+                    onClick={handleDeleteAccount}
+                    style={{
+                      background: '#ff3333',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.4rem 0.8rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseOver={(e) => e.target.style.opacity = '0.9'}
+                    onMouseOut={(e) => e.target.style.opacity = '1'}
+                  >
+                    Delete Account
+                  </button>
+                </div>
+              </div>
+
             </div>
 
             <div className="modal-footer">
-              <button className="btn btn-primary" onClick={() => setSettingsActive(false)}>Save Settings</button>
+              <button className="btn btn-secondary" onClick={() => setSettingsActive(false)} style={{ marginRight: '0.5rem' }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveProfile}>Save Config</button>
             </div>
           </div>
         </div>

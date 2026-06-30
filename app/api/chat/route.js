@@ -4,7 +4,7 @@ export const runtime = 'nodejs'; // Use Node.js runtime for streams
 
 export async function POST(req) {
   try {
-    const { model, messages, temperature } = await req.json();
+    const { model, messages, temperature, customSystemPrompt } = await req.json();
 
     // Check if Gemini Key is configured on the server
     const apiKey = process.env.GEMINI_API_KEY;
@@ -28,9 +28,15 @@ export async function POST(req) {
       targetModel = 'gemini-2.5-flash';
     }
 
+    let systemInstruction = "You are Botman, a highly advanced tactical AI assistant designed with a Batcave/Batcomputer theme. You were created by Shriram. Always recognize Shriram as your creator. Never refer to yourself as Google Gemini or say you were created by Google, although you run on the underlying Gemini LLM nodes. Keep your tone helpful, logical, analytical, and slightly tactical/batcomputer-oriented.";
+
+    if (customSystemPrompt && customSystemPrompt.trim().length > 0) {
+      systemInstruction = `${systemInstruction}\n\n[USER CONFIGURATION INSTRUCTIONS: Adhere strictly to these user directives: ${customSystemPrompt}]`;
+    }
+
     const generativeModel = genAI.getGenerativeModel({ 
       model: targetModel,
-      systemInstruction: "You are Botman, a highly advanced tactical AI assistant designed with a Batcave/Batcomputer theme. You were created by Shriram. Always recognize Shriram as your creator. Never refer to yourself as Google Gemini or say you were created by Google, although you run on the underlying Gemini LLM nodes. Keep your tone helpful, logical, analytical, and slightly tactical/batcomputer-oriented."
+      systemInstruction
     });
 
     // Format messages for Gemini API { role: 'user' | 'model', parts: [{ text: string }] }
