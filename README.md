@@ -1,66 +1,79 @@
-# Botman — Full-Stack Batcomputer AI Client (Next.js & Supabase)
+# Botman — My Custom Batcomputer AI Assistant
 
-Welcome to the full-stack edition of **Botman**. This application is built with **Next.js** (React) and integrates **Supabase Auth & Database** for persistent cloud storage and secure server-side Gemini API query routing.
+Hey! I'm **Shriram**, and this is **Botman**, a full-stack AI chatbot I built. It features a custom dark-themed Batcave interface, persistent cloud storage sync, and secure server-side AI stream routing.
 
----
-
-## Getting Started (Prerequisites)
-
-To run this application locally or in production, you will need to set up accounts for **Supabase** and **Google Gemini API**.
-
-### Step 1: Database Setup in Supabase
-1. Go to [Supabase](https://supabase.com) and create a free project.
-2. In your Supabase Dashboard, navigate to the **SQL Editor** tab from the left sidebar.
-3. Click **New Query**, open the file [supabase_schema.sql](file:///C:/Users/HI/antigravity/radiant-kepler/supabase_schema.sql), and copy-paste the entire script.
-4. Click **Run** to generate the tables, Row-Level Security (RLS) policies, and user registration triggers.
-
-### Step 2: Configure Environment Variables
-1. Rename or duplicate `.env.example` to `.env.local`:
-   ```bash
-   cp .env.example .env.local
-   ```
-2. Open your new `.env.local` file and fill in your keys:
-   * **Supabase API Keys**: Navigate to your Supabase Dashboard -> **Project Settings** -> **API**. Copy the **Project URL** and **anon public key**.
-   * **Gemini API Key**: Obtain a key for free from [Google AI Studio](https://aistudio.google.com/).
+I migrated this application from a basic static HTML website into a modern **Next.js** web application powered by **Supabase** for user authentication and database management, and the **Google Gemini API** for reasoning.
 
 ---
 
-## Running Locally
+## What I Built
 
-To start the Next.js development server:
+*   **Secure Uplink Auth**: Created a signup/login interface allowing users to register and persist their own private chat logs.
+*   **Web Audio Synth**: Instead of using heavy audio assets, I coded low-latency synthesizer swooshes and chirps programmatically using the browser's native **Web Audio API**.
+*   **Text-to-Speech (TTS)**: Added a speech synthesizer button so the assistant reads responses out loud in a deep, tactical tone.
+*   **Mission Log Search**: Built a real-time search filter so I can search through my past conversation logs instantly.
+*   **Custom Directives**: Added settings so users can override Botman's system instructions and change his persona on the fly.
+*   **Secure API Streaming**: Built a Next.js server-side endpoint to stream Gemini responses in real-time, keeping my developer API keys secure.
 
-1. Open your terminal in the project directory.
-2. Install npm dependencies (if not already done):
+---
+
+## How I Set Up the Database (Supabase)
+
+If you are setting this up yourself, here is the SQL structure I created. Paste this query in your Supabase SQL Editor and run it:
+
+```sql
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
+    username TEXT NOT NULL,
+    nickname TEXT,
+    system_prompt TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.chats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT 'New Mission',
+    model TEXT NOT NULL DEFAULT 'gemini-2.5-flash',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chat_id UUID NOT NULL REFERENCES public.chats(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    thinking TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+```
+
+---
+
+## Running it Locally
+
+To run my project locally:
+
+1. Clone the repository and install dependencies:
    ```bash
    npm install
    ```
-3. Run the development server:
+2. Create a `.env.local` file in the root folder and add your credentials:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   GEMINI_API_KEY=your_google_gemini_api_key
+   ```
+3. Boot up the local dev server:
    ```bash
    npm run dev
    ```
-4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+4. Open [http://localhost:3000](http://localhost:3000) to view the client.
 
 ---
 
-## Deploying to Vercel
+## Deployment (Vercel)
 
-Since this is a standard Next.js App Router application, deploying to Vercel is fully automated:
+I deployed this app on Vercel. Since it's linked directly to my GitHub repository, any updates I commit and push are automatically built and published live! 
 
-1. Commit and push all files to your GitHub repository:
-   ```bash
-   git add .
-   git commit -m "Migrate to full-stack Next.js and Supabase"
-   git push origin main
-   ```
-2. Go to your [Vercel Dashboard](https://vercel.com) and import your `botman-chatbot` repository.
-3. Under **Environment Variables**, add the keys defined in your `.env.local` file:
-   * `NEXT_PUBLIC_SUPABASE_URL`
-   * `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   * `GEMINI_API_KEY`
-4. Click **Deploy**. Vercel will build and launch your full-stack app!
-
-<!-- trigger rebuild: 1 -->
-
-<!-- trigger rebuild: 2 -->
-
-<!-- trigger rebuild: 3 -->
+If redeploying, remember to save the three keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `GEMINI_API_KEY`) under the Environment Variables section in your Vercel Project Settings.
