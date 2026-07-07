@@ -760,11 +760,29 @@ export default function Dashboard({ session, onSignOut }) {
             ));
           };
 
-          return trimmed ? (
-            <p key={`${idx}-${lineIdx}`} style={{ marginBottom: '0.75rem' }}>
-              {renderLineContent()}
-            </p>
-          ) : null;
+          if (trimmed) {
+            const imageMatch = trimmed.match(/https:\/\/image\.pollinations\.ai\/prompt\/[^\s\)]+/);
+            if (imageMatch) {
+              const imageUrl = imageMatch[0];
+              return (
+                <div key={`${idx}-${lineIdx}`} className="ai-generated-image" style={{ margin: '1rem 0', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-glass)', background: '#09090e' }}>
+                  <img 
+                    src={imageUrl} 
+                    alt="AI Generated Visual" 
+                    style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', display: 'block' }}
+                    loading="lazy"
+                  />
+                </div>
+              );
+            }
+
+            return (
+              <p key={`${idx}-${lineIdx}`} style={{ marginBottom: '0.75rem' }}>
+                {renderLineContent()}
+              </p>
+            );
+          }
+          return null;
         });
       }
     });
