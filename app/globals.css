@@ -1121,3 +1121,89 @@ body {
     white-space: nowrap;
   }
 }
+
+/* ----------------------------------------------------
+   Advanced Immersive Operations Styles
+   ---------------------------------------------------- */
+
+/* Combat Mode Override variables */
+.combat-active {
+  --accent-yellow: #ff3333 !important;
+  --accent-gold: #ff1111 !important;
+  --border-glow: rgba(255, 51, 51, 0.3) !important;
+  --bg-bubble-user: linear-gradient(135deg, #cc2a2a 0%, #ff3333 100%) !important;
+}
+
+.combat-active .chat-workspace {
+  background: radial-gradient(circle at 50% 50%, #170707 0%, #080202 100%) !important;
+}
+
+.combat-active .logo {
+  background: linear-gradient(135deg, #ff3333 0%, #880000 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.combat-active .new-chat-btn:hover {
+  box-shadow: 0 0 15px rgba(255, 51, 51, 0.4) !important;
+}
+
+.combat-active .input-container:focus-within {
+  border-color: #ff3333 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 15px rgba(255, 51, 51, 0.2) !important;
+}
+
+@keyframes redPulse {
+  0% { box-shadow: inset 0 0 15px rgba(255, 0, 0, 0.03); }
+  50% { box-shadow: inset 0 0 35px rgba(255, 0, 0, 0.12); }
+  100% { box-shadow: inset 0 0 15px rgba(255, 0, 0, 0.03); }
+}
+
+.combat-active .messages-container {
+  animation: redPulse 2s infinite ease-in-out;
+}
+
+/* Sliding Side-Drawer Tactical Panel */
+.tactical-panel {
+  position: absolute;
+  top: 60px;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  background: rgba(8, 8, 12, 0.95);
+  border-left: 1px solid var(--border-glass);
+  box-shadow: -15px 0 35px rgba(0, 0, 0, 0.6);
+  z-index: 95;
+  transform: translateX(100%);
+  transition: transform var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(15px);
+  overflow-y: auto;
+  padding: 1.25rem;
+  gap: 1.25rem;
+}
+
+.tactical-panel.active {
+  transform: translateX(0);
+}
+
+.tactical-card {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.tactical-card h3 {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  color: var(--accent-yellow);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding-bottom: 0.25rem;
+  font-weight: 700;
+}
+

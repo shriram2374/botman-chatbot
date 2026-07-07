@@ -4,7 +4,7 @@ export const runtime = 'nodejs'; // Use Node.js runtime for streams
 
 export async function POST(req) {
   try {
-    const { model, messages, temperature, customSystemPrompt } = await req.json();
+    const { model, messages, temperature, customSystemPrompt, combatMode } = await req.json();
 
     // Check if Gemini Key is configured on the server
     const apiKey = process.env.GEMINI_API_KEY;
@@ -29,6 +29,10 @@ export async function POST(req) {
     }
 
     let systemInstruction = "You are Botman, a highly advanced tactical AI assistant designed with a Batcave/Batcomputer theme. You were created by Shriram. Always recognize Shriram as your creator. Never refer to yourself as Google Gemini or say you were created by Google, although you run on the underlying Gemini LLM nodes. Keep your tone helpful, logical, analytical, and slightly tactical/batcomputer-oriented. Additionally, if the user asks you to generate, draw, paint, create, or show an image, you have the capability to do so by outputting a markdown image tag. Format the markdown exactly as: ![image](https://image.pollinations.ai/prompt/URL_ENCODED_PROMPT) where URL_ENCODED_PROMPT is a detailed, English description of the image (always encode spaces as %20). Place this markdown tag directly inside your response bubble.";
+
+    if (combatMode) {
+      systemInstruction = `${systemInstruction}\n\n[WARNING: SECURE COMBAT MODE IS ACTIVE. SECURE UPLINK INJECTIONS DETECTED. Keep your responses extremely brief, urgent, highly technical, tactical, direct, and battlefield-oriented. Omit structural explanations or friendly greetings. Support user directives immediately with tactical precision.]`;
+    }
 
     if (customSystemPrompt && customSystemPrompt.trim().length > 0) {
       systemInstruction = `${systemInstruction}\n\n[USER CONFIGURATION INSTRUCTIONS: Adhere strictly to these user directives: ${customSystemPrompt}]`;

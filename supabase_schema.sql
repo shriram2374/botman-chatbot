@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     username TEXT NOT NULL,
     nickname TEXT,
     system_prompt TEXT,
+    gadgets JSONB DEFAULT '{"batarangs": 10, "grapple_charge": 100, "smoke_pellets": 5}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -15,6 +16,8 @@ CREATE TABLE IF NOT EXISTS public.chats (
     title TEXT NOT NULL DEFAULT 'New Mission',
     model TEXT NOT NULL DEFAULT 'gemini-2.5-flash',
     is_shared BOOLEAN NOT NULL DEFAULT false,
+    is_encrypted BOOLEAN NOT NULL DEFAULT false,
+    encryption_pin TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -107,6 +110,9 @@ CREATE TRIGGER on_auth_user_created
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS nickname TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS system_prompt TEXT;
 ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS is_shared BOOLEAN DEFAULT false;
+ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT false;
+ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS encryption_pin TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS gadgets JSONB DEFAULT '{"batarangs": 10, "grapple_charge": 100, "smoke_pellets": 5}'::jsonb;
 
 -- Public sharing access policies
 CREATE POLICY "Anyone can view shared chats" 
