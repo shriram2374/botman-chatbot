@@ -4,6 +4,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     nickname TEXT,
     system_prompt TEXT,
     gadgets JSONB DEFAULT '{"batarangs": 10, "grapple_charge": 100, "smoke_pellets": 5}'::jsonb,
+    theme_color TEXT DEFAULT 'gold',
+    max_tokens INTEGER DEFAULT 1000,
+    matrix_rain BOOLEAN DEFAULT false,
+    persona_preset TEXT DEFAULT 'default',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -113,6 +117,10 @@ ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS is_shared BOOLEAN DEFAULT fals
 ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT false;
 ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS encryption_pin TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS gadgets JSONB DEFAULT '{"batarangs": 10, "grapple_charge": 100, "smoke_pellets": 5}'::jsonb;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS theme_color TEXT DEFAULT 'gold';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS max_tokens INTEGER DEFAULT 1000;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS matrix_rain BOOLEAN DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS persona_preset TEXT DEFAULT 'default';
 
 -- Public sharing access policies
 CREATE POLICY "Anyone can view shared chats" 

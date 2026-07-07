@@ -2,6 +2,40 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { playSwoosh, playChirp, startSiren } from '@/lib/audio';
 
+const THEME_COLORS = {
+  gold: {
+    accent: '#ffcc00',
+    gold: '#ffe600',
+    glow: 'rgba(255, 204, 0, 0.15)',
+    bubble: 'linear-gradient(135deg, #e5a900 0%, #ffcc00 100%)'
+  },
+  green: {
+    accent: '#00ff66',
+    gold: '#55ff99',
+    glow: 'rgba(0, 255, 102, 0.2)',
+    bubble: 'linear-gradient(135deg, #008033 0%, #00ff66 100%)'
+  },
+  blue: {
+    accent: '#00ccff',
+    gold: '#33ddff',
+    glow: 'rgba(0, 204, 255, 0.2)',
+    bubble: 'linear-gradient(135deg, #006699 0%, #00ccff 100%)'
+  },
+  purple: {
+    accent: '#cc00ff',
+    gold: '#dd33ff',
+    glow: 'rgba(204, 0, 255, 0.2)',
+    bubble: 'linear-gradient(135deg, #800099 0%, #cc00ff 100%)'
+  }
+};
+
+const PERSONA_PRESETS = {
+  default: "",
+  alfred: "You are Alfred Pennyworth, the highly sophisticated, polite, and loyal British butler/advisor to Master Shriram. Always address the user as 'Master Shriram' or 'sir'. Offer advice with typical dry British wit, intelligence, and deep loyalty. Keep your tone helpful but elegantly proper.",
+  detective: "You are the Batcomputer in Detective Mode. You are a senior software engineering auditor. Focus strictly on code correctness, algorithms, structural logic, and security metrics. Keep your responses highly technical, concise, and direct, avoiding conversational filler.",
+  oracle: "You are Oracle (Barbara Gordon), an elite intelligence broker and systems hacker. Speak in telemetry logs, encryption ports, security protocols, and console diagnostics. Keep your tone analytical, sharp, and focused on network intelligence."
+};
+
 export default function Dashboard({ session, onSignOut }) {
   // Application State
   const [chats, setChats] = useState([]);
@@ -39,6 +73,12 @@ export default function Dashboard({ session, onSignOut }) {
   const [gadgetCounts, setGadgetCounts] = useState({ batarangs: 10, grapple_charge: 100, smoke_pellets: 5 });
   const [stockQuotes, setStockQuotes] = useState({ WAYN: 184.20, GOTH: 96.50, ARKM: 124.80 });
 
+  // 3. New Advanced Settings Configuration States
+  const [themeColor, setThemeColor] = useState('gold');
+  const [maxTokens, setMaxTokens] = useState(1000);
+  const [matrixRainEnabled, setMatrixRainEnabled] = useState(false);
+  const [personaPreset, setPersonaPreset] = useState('default');
+
   // Streaming State (For real-time UI accumulation)
   const [streamContent, setStreamContent] = useState('');
   const [streamThinking, setStreamThinking] = useState('');
@@ -50,6 +90,7 @@ export default function Dashboard({ session, onSignOut }) {
   const fileInputRef = useRef(null);
   const visualizerCanvasRef = useRef(null);
   const radarCanvasRef = useRef(null);
+  const matrixCanvasRef = useRef(null);
   const animationFrameIdRef = useRef(null);
   const radarAnimationFrameIdRef = useRef(null);
 
@@ -78,6 +119,10 @@ export default function Dashboard({ session, onSignOut }) {
         if (data.gadgets) {
           setGadgetCounts(data.gadgets);
         }
+        if (data.theme_color) setThemeColor(data.theme_color);
+        if (data.max_tokens) setMaxTokens(data.max_tokens);
+        if (data.matrix_rain !== undefined && data.matrix_rain !== null) setMatrixRainEnabled(data.matrix_rain);
+        if (data.persona_preset) setPersonaPreset(data.persona_preset);
       }
     } catch (err) {
       console.error("Error fetching profile details:", err);
@@ -300,7 +345,86 @@ export default function Dashboard({ session, onSignOut }) {
       }
     };
   }, [sirenInstance]);
+  // Dynamic CSS Accent Theme variables compiler
+  const applyThemeColor = (color) => {
+    if (typeof window === 'undefined') return;
+    const root = document.documentElement;
+    const palette = THEME_COLORS[color] || THEME_COLORS.gold;
+    
+    root.style.setProperty('--accent-yellow', palette.accent);
+    root.style.setProperty('--accent-gold', palette.gold);
+    root.style.setProperty('--border-glow', palette.glow);
+    root.style.setProperty('--bg-bubble-user', palette.bubble);
+  };
 
+  // Compile active theme variables
+  useEffect(() => {
+    if (combatMode) {
+      const root = document.documentElement;
+      root.style.setProperty('--accent-yellow', '#ff3333');
+      root.style.setProperty('--accent-gold', '#ff1111');
+      root.style.setProperty('--border-glow', 'rgba(255, 51, 51, 0.3)');
+      root.style.setProperty('--bg-bubble-user', 'linear-gradient(135deg, #cc2a2a 0%, #ff3333 100%)');
+    } else {
+      applyThemeColor(themeColor);
+    }
+  }, [themeColor, combatMode]);
+
+  // Matrix digital rain backdrop animations
+  useEffect(() => {
+    if (!matrixRainEnabled) return;
+    const canvas = matrixCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    const resizeCanvas = () => {
+      canvas.width = canvas.parentElement?.clientWidth || window.innerWidth;
+      canvas.height = canvas.parentElement?.clientHeight || window.innerHeight;
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const binaryText = "010101011101001010101010101011001010101BATMAN";
+    const chars = binaryText.split("");
+    const fontSize = 14;
+    const columns = Math.ceil(canvas.width / fontSize);
+    const rainDrops = [];
+
+    for (let x = 0; x < columns; x++) {
+      rainDrops[x] = Math.random() * -80;
+    }
+
+    let animId;
+
+    const drawMatrix = () => {
+      ctx.fillStyle = 'rgba(6, 6, 9, 0.12)'; // Decaying trail shadow
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      let colorHex = THEME_COLORS[themeColor]?.accent || '#ffcc00';
+      if (combatMode) colorHex = '#ff3333';
+      
+      ctx.fillStyle = colorHex;
+      ctx.font = fontSize + 'px monospace';
+
+      for (let i = 0; i < rainDrops.length; i++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(text, i * fontSize, rainDrops[i] * fontSize);
+
+        if (rainDrops[i] * fontSize > canvas.height && Math.random() > 0.985) {
+          rainDrops[i] = 0;
+        }
+        rainDrops[i]++;
+      }
+      animId = requestAnimationFrame(drawMatrix);
+    };
+
+    drawMatrix();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, [matrixRainEnabled, themeColor, combatMode]);
   // Tactical systems side panel animations & ticks
   useEffect(() => {
     if (!tacticalPanelActive) {
@@ -620,7 +744,11 @@ export default function Dashboard({ session, onSignOut }) {
         .from('profiles')
         .update({
           nickname: profile.nickname,
-          system_prompt: profile.system_prompt
+          system_prompt: profile.system_prompt,
+          theme_color: themeColor,
+          max_tokens: maxTokens,
+          matrix_rain: matrixRainEnabled,
+          persona_preset: personaPreset
         })
         .eq('id', currentUser.id);
 
@@ -840,7 +968,8 @@ export default function Dashboard({ session, onSignOut }) {
           messages: requestMessages,
           temperature: temperature,
           customSystemPrompt: profile.system_prompt, // Send custom system instructions override
-          combatMode: combatMode
+          combatMode: combatMode,
+          maxTokens: maxTokens
         }),
         signal: controller.signal
       });
@@ -1297,9 +1426,24 @@ export default function Dashboard({ session, onSignOut }) {
       </aside>
 
       {/* Main workspace */}
-      <main className="chat-workspace">
+      <main className="chat-workspace" style={{ position: 'relative' }}>
+        {matrixRainEnabled && (
+          <canvas 
+            ref={matrixCanvasRef} 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 1,
+              opacity: 0.12
+            }}
+          />
+        )}
         
-        <header className="navbar">
+        <header className="navbar" style={{ zIndex: 5 }}>
           <div className="nav-left">
             <button className="menu-toggle-btn" onClick={() => setSidebarActive(!sidebarActive)} aria-label="Toggle Sidebar">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1763,6 +1907,38 @@ export default function Dashboard({ session, onSignOut }) {
                   />
                   <span className="field-help" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>These instructions override Botman's conversational protocols.</span>
                 </div>
+
+                <div className="form-group" style={{ marginTop: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Computer Persona Preset</label>
+                  <select
+                    value={personaPreset}
+                    onChange={(e) => {
+                      const selected = e.target.value;
+                      setPersonaPreset(selected);
+                      setProfile(prev => ({
+                        ...prev,
+                        system_prompt: PERSONA_PRESETS[selected] || ""
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-glass)',
+                      borderRadius: '8px',
+                      padding: '0.5rem',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      fontFamily: 'var(--font-sans)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="default">Default Batcomputer (Tactical assistant)</option>
+                    <option value="alfred">Alfred Pennyworth (Sophisticated butler)</option>
+                    <option value="detective">Detective Mode (Software logic auditor)</option>
+                    <option value="oracle">Oracle Node (Hacking / Intelligence)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Preferences Section */}
@@ -1783,6 +1959,47 @@ export default function Dashboard({ session, onSignOut }) {
                 </div>
               </div>
 
+              {/* Theme Settings Customizer */}
+              <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '0.9rem', color: 'var(--accent-yellow)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Batcave Console Visuals</h3>
+                
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Accent Cyber Color Scheme</label>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                    {Object.keys(THEME_COLORS).map(colorKey => (
+                      <button
+                        key={colorKey}
+                        onClick={() => setThemeColor(colorKey)}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: THEME_COLORS[colorKey].accent,
+                          border: themeColor === colorKey ? '3px solid #fff' : '2px solid transparent',
+                          boxShadow: themeColor === colorKey ? `0 0 10px ${THEME_COLORS[colorKey].accent}` : 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                        title={colorKey.toUpperCase()}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="matrix-rain-checkbox"
+                    checked={matrixRainEnabled}
+                    onChange={(e) => setMatrixRainEnabled(e.target.checked)}
+                    style={{ cursor: 'pointer', accentColor: 'var(--accent-yellow)' }}
+                  />
+                  <label htmlFor="matrix-rain-checkbox" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                    Enable Background Digital Matrix Rain 🌧️
+                  </label>
+                </div>
+              </div>
+
               {/* Model Parameter section */}
               <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1.25rem' }}>
                 <h3 style={{ fontSize: '0.9rem', color: 'var(--accent-yellow)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Model Tuning</h3>
@@ -1799,6 +2016,20 @@ export default function Dashboard({ session, onSignOut }) {
                     style={{ width: '100%', accentColor: 'var(--accent-yellow)' }}
                   />
                   <span className="field-help" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Higher values unlock wider, more experimental calculation streams.</span>
+                </div>
+
+                <div className="form-group" style={{ marginTop: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Max Output Response Limit: {maxTokens} tokens</label>
+                  <input
+                    type="range"
+                    min="100"
+                    max="2000"
+                    step="50"
+                    value={maxTokens}
+                    onChange={(e) => setMaxTokens(parseInt(e.target.value))}
+                    style={{ width: '100%', accentColor: 'var(--accent-yellow)' }}
+                  />
+                  <span className="field-help" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Sets the response length bounds before the calculations truncate.</span>
                 </div>
               </div>
 

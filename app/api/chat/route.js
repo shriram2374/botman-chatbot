@@ -4,7 +4,7 @@ export const runtime = 'nodejs'; // Use Node.js runtime for streams
 
 export async function POST(req) {
   try {
-    const { model, messages, temperature, customSystemPrompt, combatMode } = await req.json();
+    const { model, messages, temperature, customSystemPrompt, combatMode, maxTokens } = await req.json();
 
     // Check if Gemini Key is configured on the server
     const apiKey = process.env.GEMINI_API_KEY;
@@ -68,7 +68,7 @@ export async function POST(req) {
       contents,
       generationConfig: {
         temperature: temperature ?? 0.7,
-        maxOutputTokens: 2048,
+        maxOutputTokens: maxTokens || 1000,
       }
     });
 
