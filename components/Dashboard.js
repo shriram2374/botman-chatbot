@@ -761,17 +761,30 @@ export default function Dashboard({ session, onSignOut }) {
           };
 
           if (trimmed) {
-            const imageMatch = trimmed.match(/https:\/\/image\.pollinations\.ai\/prompt\/[^\s\)]+/);
-            if (imageMatch) {
-              const imageUrl = imageMatch[0];
+            const urlIndex = trimmed.indexOf("https://image.pollinations.ai/prompt/");
+            if (urlIndex !== -1) {
+              let urlEnd = trimmed.indexOf(")", urlIndex);
+              if (urlEnd === -1) {
+                urlEnd = trimmed.length;
+              }
+              const rawUrl = trimmed.substring(urlIndex, urlEnd);
+              // Replace spaces in prompt URL with %20 automatically
+              const cleanUrl = rawUrl.replace(/\s+/g, "%20");
+              const textBefore = trimmed.substring(0, trimmed.indexOf("![") !== -1 ? trimmed.indexOf("![") : urlIndex).trim();
+              const textAfter = trimmed.substring(urlEnd + (trimmed[urlEnd] === ')' ? 1 : 0)).trim();
+
               return (
-                <div key={`${idx}-${lineIdx}`} className="ai-generated-image" style={{ margin: '1rem 0', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-glass)', background: '#09090e' }}>
-                  <img 
-                    src={imageUrl} 
-                    alt="AI Generated Visual" 
-                    style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', display: 'block' }}
-                    loading="lazy"
-                  />
+                <div key={`${idx}-${lineIdx}`} style={{ marginBottom: '1rem' }}>
+                  {textBefore && <p style={{ marginBottom: '0.5rem' }}>{textBefore}</p>}
+                  <div className="ai-generated-image" style={{ margin: '1rem 0', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-glass)', background: '#09090e' }}>
+                    <img 
+                      src={cleanUrl} 
+                      alt="AI Generated Visual" 
+                      style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', display: 'block' }}
+                      loading="lazy"
+                    />
+                  </div>
+                  {textAfter && <p style={{ marginTop: '0.5rem' }}>{textAfter}</p>}
                 </div>
               );
             }
