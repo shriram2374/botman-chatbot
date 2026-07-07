@@ -39,11 +39,25 @@ export async function POST(req) {
       systemInstruction
     });
 
-    // Format messages for Gemini API { role: 'user' | 'model', parts: [{ text: string }] }
-    const contents = messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
+    // Format messages for Gemini API { role: 'user' | 'model', parts: [{ text: string }, { inlineData: ... }] }
+    const contents = messages.map(msg => {
+      const parts = [{ text: msg.content || "" }];
+      
+      // If there is a multi-modal file attached to this message
+      if (msg.fileData && msg.fileData.base64 && msg.fileData.mimeType) {
+        parts.push({
+          inlineData: {
+            data: msg.fileData.base64,
+            mimeType: msg.fileData.mimeType
+          }
+        });
+      }
+
+      return {
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts
+      };
+    });
 
     // Trigger content stream
     const result = await generativeModel.generateContentStream({

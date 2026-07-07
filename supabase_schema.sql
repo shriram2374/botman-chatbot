@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.chats (
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     title TEXT NOT NULL DEFAULT 'New Mission',
     model TEXT NOT NULL DEFAULT 'gemini-2.5-flash',
+    is_shared BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -105,3 +106,19 @@ CREATE TRIGGER on_auth_user_created
 -- Database Migrations for existing deployments:
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS nickname TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS system_prompt TEXT;
+ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS is_shared BOOLEAN DEFAULT false;
+
+-- Public sharing access policies
+CREATE POLICY "Anyone can view shared chats" 
+ON public.chats FOR SELECT 
+USING (is_shared = true);
+
+CREATE POLICY "Anyone can view messages in shared chats" 
+ON public.messages FOR SELECT 
+USING (
+    EXISTS (
+        SELECT 1 FROM public.chats 
+        WHERE public.chats.id = messages.chat_id 
+        AND public.chats.is_shared = true
+    )
+);

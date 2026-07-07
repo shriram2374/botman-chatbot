@@ -14,11 +14,16 @@ export default function Dashboard({ session, onSignOut }) {
   const [settingsActive, setSettingsActive] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
 
-  // Search & Profile Customizations
+  // Search, Audio Controls, & Profile Customizations
   const [searchQuery, setSearchQuery] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
   const [profile, setProfile] = useState({ nickname: '', system_prompt: '' });
+
+  // 1. New Features States: Voice Input, File Upload, Public Share
+  const [isListening, setIsListening] = useState(false);
+  const [attachedFile, setAttachedFile] = useState(null); // { base64, mimeType, name }
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Streaming State (For real-time UI accumulation)
   const [streamContent, setStreamContent] = useState('');
@@ -28,6 +33,9 @@ export default function Dashboard({ session, onSignOut }) {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const visualizerCanvasRef = useRef(null);
+  const animationFrameIdRef = useRef(null);
 
   const currentUser = session?.user;
   const username = currentUser?.email?.split('@')[0] || 'Agent';
@@ -115,7 +123,7 @@ export default function Dashboard({ session, onSignOut }) {
     }
     setStreamContent('');
     setStreamThinking('');
-    // Stop any speaking speech synthesis on chat swap
+    setAttachedFile(null);
     if (typeof window !== 'undefined') {
       window.speechSynthesis?.cancel();
       setSpeakingMessageId(null);
@@ -134,6 +142,177 @@ export default function Dashboard({ session, onSignOut }) {
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [inputText]);
+
+  // ----------------------------------------------------
+  // Glowing Batcomputer Audio Visualizer Loop
+  // ----------------------------------------------------
+  useEffect(() => {
+    const canvas = visualizerCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    let angle = 0;
+
+    const renderVisualizer = () => {
+      const active = isGenerating || speakingMessageId !== null || isListening;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const baseRadius = 14;
+
+      // Glow effect styling
+      ctx.shadowBlur = active ? 12 : 2;
+      ctx.shadowColor = isListening ? '#38bdf8' : 'var(--accent-yellow)';
+
+      // Outer pulsing ring
+      ctx.beginPath();
+      const pulseFactor = active ? Math.sin(angle) * 4 : 0;
+      ctx.arc(centerX, centerY, baseRadius + pulseFactor, 0, Math.PI * 2);
+      ctx.strokeStyle = isListening ? 'rgba(56, 189, 248, 0.6)' : 'rgba(255, 204, 0, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Inner glowing core
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+      ctx.fillStyle = isListening ? '#38bdf8' : 'var(--accent-yellow)';
+      ctx.fill();
+
+      // Animated orbiting wave nodes if active
+      if (active) {
+        angle += 0.15;
+        const waveCount = 4;
+        for (let i = 0; i < waveCount; i++) {
+          const offsetAngle = angle + (i * Math.PI / 2);
+          const nodeX = centerX + Math.cos(offsetAngle) * (baseRadius + 6);
+          const nodeY = centerY + Math.sin(offsetAngle) * (baseRadius + 6);
+          ctx.beginPath();
+          ctx.arc(nodeX, nodeY, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = isListening ? '#7dd3fc' : '#fff';
+          ctx.fill();
+        }
+      }
+
+      animationFrameIdRef.current = requestAnimationFrame(renderVisualizer);
+    };
+
+    renderVisualizer();
+
+    return () => {
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+    };
+  }, [isGenerating, speakingMessageId, isListening]);
+
+  // ----------------------------------------------------
+  // Speech-To-Text Recognition (Voice Input)
+  // ----------------------------------------------------
+  const handleToggleVoiceInput = () => {
+    if (typeof window === 'undefined') return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice input is not supported in this browser. Please try Google Chrome.");
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      if (soundEnabled) playChirp();
+    };
+
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setInputText(prev => prev + (prev ? " " : "") + transcript);
+    };
+
+    recognition.onerror = (err) => {
+      console.error("Speech recognition error:", err);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
+  // ----------------------------------------------------
+  // Multi-modal File Reader (Image / Text upload)
+  // ----------------------------------------------------
+  const handleFileAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Limit to 4MB max for free Gemini API rate bounds
+    if (file.size > 4 * 1024 * 1024) {
+      alert("File is too large. Please select an image or text file smaller than 4MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Data = reader.result.split(',')[1];
+      setAttachedFile({
+        base64: base64Data,
+        mimeType: file.type,
+        name: file.name
+      });
+    };
+
+    reader.readAsDataURL(file);
+    e.target.value = ""; // Reset input selection
+  };
+
+  // ----------------------------------------------------
+  // Public Chat Sharing Link Toggler
+  // ----------------------------------------------------
+  const handleToggleShare = async () => {
+    if (!activeChatId) return;
+
+    const activeChat = chats.find(c => c.id === activeChatId);
+    const updatedSharedState = !activeChat?.is_shared;
+
+    try {
+      const { error } = await supabase
+        .from('chats')
+        .update({ is_shared: updatedSharedState })
+        .eq('id', activeChatId);
+
+      if (error) throw error;
+
+      // Update local state list
+      setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, is_shared: updatedSharedState } : c));
+
+      if (updatedSharedState) {
+        const shareLink = `${window.location.origin}/share/${activeChatId}`;
+        navigator.clipboard.writeText(shareLink).then(() => {
+          setShareCopied(true);
+          setTimeout(() => setShareCopied(false), 3000);
+        });
+      }
+    } catch (err) {
+      console.error("Error updating share settings:", err);
+      alert("Failed to toggle sharing permissions: " + err.message);
+    }
+  };
 
   // ----------------------------------------------------
   // Profile Configuration & Actions
@@ -161,7 +340,6 @@ export default function Dashboard({ session, onSignOut }) {
   const handleDeleteAccount = async () => {
     if (!confirm("CRITICAL WARNING: This will permanently delete your user profile and purge all messages from the database. This action is irreversible. Proceed?")) return;
     try {
-      // ON DELETE CASCADE in Supabase schema will automatically delete profiles, chats, and messages
       const { error } = await supabase
         .from('profiles')
         .delete()
@@ -186,6 +364,7 @@ export default function Dashboard({ session, onSignOut }) {
         user_id: currentUser.id,
         title: 'New Mission',
         model: model,
+        is_shared: false
       };
 
       const { data, error } = await supabase
@@ -270,12 +449,19 @@ export default function Dashboard({ session, onSignOut }) {
 
   const handleSendMessage = async (promptText = null) => {
     const textToSend = (promptText || inputText).trim();
-    if (!textToSend || !activeChatId || isGenerating) return;
+    
+    // Allow sending just a file attachment without text
+    if (!textToSend && !attachedFile) return;
+    if (!activeChatId || isGenerating) return;
 
     setInputText('');
     setIsGenerating(true);
     setStreamContent('');
     setStreamThinking('');
+
+    // Capture files locally and clear selection preview
+    const activeFile = attachedFile;
+    setAttachedFile(null);
 
     // Trigger Batcave sound effect
     if (soundEnabled) playSwoosh();
@@ -295,7 +481,7 @@ export default function Dashboard({ session, onSignOut }) {
     const userMsgData = {
       chat_id: activeChatId,
       role: 'user',
-      content: textToSend
+      content: textToSend + (activeFile ? `\n\n*[Attached file: ${activeFile.name}]*` : '')
     };
 
     try {
@@ -311,7 +497,8 @@ export default function Dashboard({ session, onSignOut }) {
       const isFirstMessage = currentMessages.length === 0;
       let newTitle = activeChat?.title;
       if (isFirstMessage) {
-        newTitle = textToSend.length > 24 ? textToSend.substring(0, 24) + '...' : textToSend;
+        const titleSource = textToSend || activeFile?.name || 'Attachment Log';
+        newTitle = titleSource.length > 24 ? titleSource.substring(0, 24) + '...' : titleSource;
         await supabase
           .from('chats')
           .update({ title: newTitle })
@@ -323,7 +510,11 @@ export default function Dashboard({ session, onSignOut }) {
       // 2. Trigger Server-Side Streaming API Route
       const requestMessages = [
         ...currentMessages.map(m => ({ role: m.role, content: m.content })),
-        { role: 'user', content: textToSend }
+        { 
+          role: 'user', 
+          content: textToSend,
+          fileData: activeFile // Pass Base64 data if present
+        }
       ];
 
       // Prepare simulated thinking logs before streaming live answers
@@ -452,10 +643,8 @@ export default function Dashboard({ session, onSignOut }) {
       return;
     }
 
-    // Cancel currently speaking instances
     window.speechSynthesis?.cancel();
 
-    // Clean up code blocks and markdown symbols before speaking
     const textToRead = msg.content
       .replace(/```[\s\S]*?```/g, '[code block omitted]')
       .replace(/[*#_~`>\[\]\(\)]/g, '')
@@ -466,15 +655,14 @@ export default function Dashboard({ session, onSignOut }) {
     const utterance = new SpeechSynthesisUtterance(textToRead);
     const voices = window.speechSynthesis?.getVoices() || [];
     
-    // Select low-pitch English/Male or computer voice if possible
     const tacticalVoice = voices.find(v => 
       v.lang.startsWith('en') && 
       (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('microsoft david') || v.name.toLowerCase().includes('natural'))
     );
     
     if (tacticalVoice) utterance.voice = tacticalVoice;
-    utterance.pitch = 0.85; // Low-pitch tactical/batcomputer sound
-    utterance.rate = 0.95;  // Slightly slower pacing
+    utterance.pitch = 0.85;
+    utterance.rate = 0.95;
 
     utterance.onend = () => setSpeakingMessageId(null);
     utterance.onerror = () => setSpeakingMessageId(null);
@@ -587,10 +775,11 @@ export default function Dashboard({ session, onSignOut }) {
     handleSendMessage(prompt);
   };
 
-  // Filter chats by search query input
   const filteredChats = chats.filter(chat => 
     chat.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const activeChat = chats.find(c => c.id === activeChatId);
 
   return (
     <div className="app-container" id="app-container">
@@ -657,16 +846,7 @@ export default function Dashboard({ session, onSignOut }) {
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery('')}
-                style={{
-                  position: 'absolute',
-                  right: '0.5rem',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  padding: 0,
-                  fontSize: '0.85rem'
-                }}
+                style={{ position: 'absolute', right: '0.5rem', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, fontSize: '0.85rem' }}
               >
                 ×
               </button>
@@ -745,8 +925,35 @@ export default function Dashboard({ session, onSignOut }) {
               </svg>
             </button>
             <div className="chat-title" id="chat-title">
-              {chats.find(c => c.id === activeChatId)?.title || 'New Mission'}
+              {activeChat?.title || 'New Mission'}
             </div>
+            {/* Share link button */}
+            {activeChatId && (
+              <button 
+                onClick={handleToggleShare}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: activeChat?.is_shared ? 'var(--accent-yellow)' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  marginLeft: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.75rem',
+                  padding: '0.2rem 0.4rem',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(255,255,255,0.05)'
+                }}
+                title="Share this mission transcript publicly"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                <span>{activeChat?.is_shared ? (shareCopied ? 'Link Copied!' : 'Shared') : 'Share'}</span>
+              </button>
+            )}
           </div>
 
           <div className="nav-right">
@@ -759,10 +966,20 @@ export default function Dashboard({ session, onSignOut }) {
                 <option value="gpt-4o-sim">Oracle-4o (Simulated)</option>
               </select>
             </div>
-            <div className={`status-indicator ${isGenerating ? 'working' : 'ready'}`}>
-              <span className="pulse-dot"></span>
-              <span className="status-text">{isGenerating ? 'Processing...' : 'Online'}</span>
+
+            {/* Glowing Spectrum Audio Visualizer Canvas */}
+            <div className="status-indicator" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <canvas 
+                ref={visualizerCanvasRef} 
+                width="34" 
+                height="34" 
+                style={{ width: '34px', height: '34px', marginRight: '-5px' }}
+              />
+              <span className="status-text" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                {isListening ? 'Listening...' : (isGenerating ? 'Decrypting...' : 'Online')}
+              </span>
             </div>
+            
             <button className="nav-new-chat-btn" onClick={handleCreateChat} title="Start new mission">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -779,7 +996,7 @@ export default function Dashboard({ session, onSignOut }) {
             <div className="welcome-screen" id="welcome-screen">
               <div className="welcome-header">
                 <h1 className="gradient-text">I am Botman. I stand watch.</h1>
-                <p className="subtitle">Uplink established, {displayName}. Configure settings to alter my persona, or initiate queries below.</p>
+                <p className="subtitle">Uplink established, {displayName}. Configure settings to alter my persona, attach files, or speak commands.</p>
               </div>
 
               <div className="suggestion-grid">
@@ -830,7 +1047,6 @@ export default function Dashboard({ session, onSignOut }) {
                   {renderFormattedMarkdown(msg.content)}
                   {msg.role === 'assistant' && (
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', justifyContent: 'flex-end' }}>
-                      {/* Text To Speech Control */}
                       <button 
                         onClick={() => handleToggleSpeech(msg)}
                         style={{
@@ -848,11 +1064,7 @@ export default function Dashboard({ session, onSignOut }) {
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                          {speakingMessageId === msg.id ? (
-                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                          ) : (
-                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                          )}
+                          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                         </svg>
                         <span>{speakingMessageId === msg.id ? "Silence" : "Speak"}</span>
                       </button>
@@ -892,15 +1104,51 @@ export default function Dashboard({ session, onSignOut }) {
 
         {/* Input Bar Panel */}
         <footer className="input-panel">
-          <div className="input-container">
+          
+          {/* File Attachment Preview Selection Bar */}
+          {attachedFile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.4rem 1rem', background: 'rgba(255,204,0,0.03)', border: '1px solid rgba(255,204,0,0.1)', borderBottom: 'none', borderTopLeftRadius: '12px', borderTopRightRadius: '12px', width: 'calc(100% - 2px)', margin: '0 auto', fontSize: '0.8rem', color: '#fff' }}>
+              <span>📎 {attachedFile.name}</span>
+              <button 
+                onClick={() => setAttachedFile(null)} 
+                style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}
+                title="Remove attachment"
+              >
+                Remove
+              </button>
+            </div>
+          )}
+
+          <div className="input-container" style={{ borderTopLeftRadius: attachedFile ? 0 : '12px', borderTopRightRadius: attachedFile ? 0 : '12px' }}>
+            
+            {/* Paperclip File Attach Hidden Input & Icon Button */}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              accept="image/*,text/*,application/pdf"
+              onChange={handleFileChange}
+            />
+            <button 
+              className="attach-btn" 
+              onClick={handleFileAttachClick} 
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.75rem 0.5rem 0.75rem 1rem', display: 'flex', alignItems: 'center' }}
+              title="Attach an image or file for analysis"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+              </svg>
+            </button>
+
             <div className="textarea-wrapper">
               <textarea
                 ref={textareaRef}
                 className="chat-input"
-                placeholder="Initiate query..."
+                placeholder={isListening ? "Listening..." : "Initiate query..."}
                 rows="1"
                 maxLength="4000"
                 value={inputText}
+                disabled={isListening}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -910,9 +1158,33 @@ export default function Dashboard({ session, onSignOut }) {
                 }}
               />
             </div>
-            <div className="input-actions">
+            
+            <div className="input-actions" style={{ paddingLeft: '0.5rem' }}>
               <div className="char-counter">{inputText.length} / 4000</div>
               <div className="btn-group">
+                
+                {/* Speech Recognition microphone activation button */}
+                <button 
+                  onClick={handleToggleVoiceInput} 
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: isListening ? '#38bdf8' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    padding: '0.4rem',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title={isListening ? "Stop listening" : "Speak your query"}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                  </svg>
+                </button>
+
                 {isGenerating && (
                   <button className="stop-btn" onClick={handleStopGeneration} title="Abort generation">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -923,7 +1195,7 @@ export default function Dashboard({ session, onSignOut }) {
                 <button
                   className="send-btn"
                   onClick={() => handleSendMessage()}
-                  disabled={inputText.trim().length === 0 || isGenerating}
+                  disabled={(inputText.trim().length === 0 && !attachedFile) || isGenerating}
                   title="Send query"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
