@@ -58,6 +58,25 @@ export default function SharePage({ params }) {
     });
   };
 
+  const handleDownloadImage = async (url, promptName) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      const safeName = promptName.substring(0, 24).replace(/[^a-zA-Z0-9]/g, '_') || 'batcomputer_img';
+      link.download = `${safeName}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Image download failed:", error);
+      window.open(url, '_blank');
+    }
+  };
+
   const renderFormattedMarkdown = (text) => {
     if (!text) return "";
     const parts = text.split(/```/g);
@@ -137,7 +156,6 @@ export default function SharePage({ params }) {
                 urlEnd = trimmed.length;
               }
               const rawUrl = trimmed.substring(urlIndex, urlEnd);
-              // Replace spaces in prompt URL with %20 automatically
               const cleanUrl = rawUrl.replace(/\s+/g, "%20");
               const textBefore = trimmed.substring(0, trimmed.indexOf("![") !== -1 ? trimmed.indexOf("![") : urlIndex).trim();
               const textAfter = trimmed.substring(urlEnd + (trimmed[urlEnd] === ')' ? 1 : 0)).trim();
@@ -145,13 +163,39 @@ export default function SharePage({ params }) {
               return (
                 <div key={`${idx}-${lineIdx}`} style={{ marginBottom: '1rem' }}>
                   {textBefore && <p style={{ marginBottom: '0.5rem' }}>{textBefore}</p>}
-                  <div className="ai-generated-image" style={{ margin: '1rem 0', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.08)', background: '#09090e' }}>
+                  <div className="ai-generated-image" style={{ margin: '1rem 0', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.08)', background: '#09090e', position: 'relative' }}>
                     <img 
                       src={cleanUrl} 
                       alt="AI Generated Visual" 
                       style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', display: 'block' }}
                       loading="lazy"
                     />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.5)', padding: '0.4rem 0.8rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <button 
+                        onClick={() => handleDownloadImage(cleanUrl, trimmed)}
+                        style={{
+                          background: 'rgba(255, 204, 0, 0.1)',
+                          border: '1px solid rgba(255, 204, 0, 0.2)',
+                          color: 'var(--accent-yellow)',
+                          borderRadius: '4px',
+                          padding: '0.2rem 0.6rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'background 0.2s'
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Download</span>
+                      </button>
+                    </div>
                   </div>
                   {textAfter && <p style={{ marginTop: '0.5rem' }}>{textAfter}</p>}
                 </div>
