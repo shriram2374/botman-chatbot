@@ -134,6 +134,18 @@ export default function Dashboard({ session, onSignOut }) {
   // ----------------------------------------------------
 
   const handleChatClick = (chat) => {
+    // If switching to a different chat, re-lock the previous chat if it was encrypted
+    if (activeChatId && activeChatId !== chat.id) {
+      const prevChat = chats.find(c => c.id === activeChatId);
+      if (prevChat && prevChat.is_encrypted) {
+        setUnlockedChats(prev => {
+          const next = new Set(prev);
+          next.delete(activeChatId);
+          return next;
+        });
+      }
+    }
+
     if (chat.is_encrypted && !unlockedChats.has(chat.id)) {
       setPinChatId(chat.id);
       setPinMode('enter');
