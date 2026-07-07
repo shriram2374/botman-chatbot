@@ -1209,63 +1209,139 @@ body {
 
 /* Light Theme Variables Overrides */
 :root.light-theme {
-  --bg-app: #f4f6f9;
-  --bg-sidebar: #eaecf0;
-  --bg-card: rgba(255, 255, 255, 0.8);
-  --bg-bubble-ai: rgba(255, 255, 255, 0.7);
+  --bg-app: #f9fafb;
+  --bg-sidebar: #f3f4f6;
+  --bg-card: #ffffff;
+  --bg-bubble-ai: #ffffff;
   
   --border-glass: rgba(0, 0, 0, 0.08);
   --border-glow: rgba(0, 0, 0, 0.08);
   
   --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
 }
 
-/* Specific styling modifications for Light Theme */
-.light-theme .welcome-screen h1 {
-  background: linear-gradient(135deg, #111827 0%, var(--accent-yellow) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* Full Light theme overrides */
+.light-theme .chat-sidebar {
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  color: #111827;
 }
-.light-theme .suggestion-card {
-  background: rgba(0, 0, 0, 0.02) !important;
+.light-theme .sidebar-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
-.light-theme .suggestion-card:hover {
-  background: rgba(0, 0, 0, 0.04) !important;
-  border-color: var(--accent-yellow) !important;
+.light-theme .chat-item {
+  color: #374151;
 }
-.light-theme .bubble {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+.light-theme .chat-item:hover,
+.light-theme .chat-item.active {
+  background: rgba(0, 0, 0, 0.04);
+  color: #111827;
+}
+.light-theme .sidebar-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--bg-sidebar);
+}
+.light-theme .sidebar-footer button {
+  color: #4b5563;
+}
+.light-theme .sidebar-footer button:hover {
+  color: #111827;
+  background: rgba(0, 0, 0, 0.04);
+}
+.light-theme .navbar {
+  background: rgba(249, 250, 251, 0.8);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.light-theme .navbar button {
+  color: #4b5563;
+}
+.light-theme .navbar button:hover {
+  color: #111827;
 }
 .light-theme .messages-container {
-  background: #fdfdfd;
+  background-color: #f9fafb;
 }
-.light-theme textarea {
-  color: #111827 !important;
-}
-.light-theme .modal {
+.light-theme .message-row.ai .bubble {
   background: #ffffff;
-  color: #111827;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #1f2937;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.04);
 }
-.light-theme .modal-header h2 {
+.light-theme .message-row.user .bubble {
+  color: #ffffff !important;
+}
+.light-theme .welcome-screen h1 {
   color: #111827;
 }
-.light-theme .form-group input, 
-.light-theme .form-group textarea, 
-.light-theme .form-group select {
+.light-theme .suggestion-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  color: #1f2937 !important;
+}
+.light-theme .suggestion-card:hover {
   background: #f3f4f6 !important;
+  border-color: var(--accent-yellow) !important;
+}
+.light-theme .suggestion-card .card-title {
   color: #111827 !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+.light-theme .suggestion-card .card-description {
+  color: #4b5563 !important;
+}
+.light-theme .input-panel {
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.light-theme .input-container {
+  background: #f3f4f6;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.light-theme .input-container textarea {
+  color: #111827;
+}
+.light-theme .input-container textarea::placeholder {
+  color: #9ca3af;
+}
+.light-theme .visualizer-status {
+  color: #4b5563;
+}
+.light-theme .settings-btn {
+  color: #4b5563;
 }
 .light-theme .tactical-panel {
-  background: #eaecf0;
+  background: #f3f4f6;
   border-left: 1px solid rgba(0, 0, 0, 0.08);
 }
 .light-theme .tactical-card {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #1f2937;
+}
+.light-theme .tactical-card h3 {
+  color: var(--accent-yellow);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.light-theme .modal {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.light-theme .form-group label {
+  color: #374151;
+}
+.light-theme .form-group input,
+.light-theme .form-group textarea,
+.light-theme .form-group select {
+  background: #f9fafb !important;
+  border: 1px solid #d1d5db !important;
+  color: #111827 !important;
+}
+.light-theme .form-group input:focus,
+.light-theme .form-group textarea:focus,
+.light-theme .form-group select:focus {
+  border-color: var(--accent-yellow) !important;
 }
 

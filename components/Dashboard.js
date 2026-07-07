@@ -29,6 +29,33 @@ const THEME_COLORS = {
   }
 };
 
+const LIGHT_THEME_COLORS = {
+  gold: {
+    accent: '#b27a00',
+    gold: '#c68a00',
+    glow: 'rgba(178, 122, 0, 0.12)',
+    bubble: 'linear-gradient(135deg, #b27a00 0%, #d49a17 100%)'
+  },
+  green: {
+    accent: '#0e7a3d',
+    gold: '#138e47',
+    glow: 'rgba(14, 122, 61, 0.12)',
+    bubble: 'linear-gradient(135deg, #0e7a3d 0%, #1a9e56 100%)'
+  },
+  blue: {
+    accent: '#0f5db3',
+    gold: '#166fc9',
+    glow: 'rgba(15, 93, 179, 0.12)',
+    bubble: 'linear-gradient(135deg, #0f5db3 0%, #207edb 100%)'
+  },
+  purple: {
+    accent: '#731fa1',
+    gold: '#852bb5',
+    glow: 'rgba(115, 31, 161, 0.12)',
+    bubble: 'linear-gradient(135deg, #731fa1 0%, #963dcc 100%)'
+  }
+};
+
 const PERSONA_PRESETS = {
   default: "",
   alfred: "You are Alfred Pennyworth, the highly sophisticated, polite, and loyal British butler/advisor to Master Shriram. Always address the user as 'Master Shriram' or 'sir'. Offer advice with typical dry British wit, intelligence, and deep loyalty. Keep your tone helpful but elegantly proper.",
@@ -348,10 +375,11 @@ export default function Dashboard({ session, onSignOut }) {
     };
   }, [sirenInstance]);
   // Dynamic CSS Accent Theme variables compiler
-  const applyThemeColor = (color) => {
+  const applyThemeColor = (color, isLight) => {
     if (typeof window === 'undefined') return;
     const root = document.documentElement;
-    const palette = THEME_COLORS[color] || THEME_COLORS.gold;
+    const map = isLight ? LIGHT_THEME_COLORS : THEME_COLORS;
+    const palette = map[color] || map.gold;
     
     root.style.setProperty('--accent-yellow', palette.accent);
     root.style.setProperty('--accent-gold', palette.gold);
@@ -368,9 +396,9 @@ export default function Dashboard({ session, onSignOut }) {
       root.style.setProperty('--border-glow', 'rgba(255, 51, 51, 0.3)');
       root.style.setProperty('--bg-bubble-user', 'linear-gradient(135deg, #cc2a2a 0%, #ff3333 100%)');
     } else {
-      applyThemeColor(themeColor);
+      applyThemeColor(themeColor, lightMode);
     }
-  }, [themeColor, combatMode]);
+  }, [themeColor, combatMode, lightMode]);
 
   // Set light theme html class
   useEffect(() => {
@@ -1979,23 +2007,26 @@ export default function Dashboard({ session, onSignOut }) {
                 <div className="form-group" style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Accent Cyber Color Scheme</label>
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
-                    {Object.keys(THEME_COLORS).map(colorKey => (
-                      <button
-                        key={colorKey}
-                        onClick={() => setThemeColor(colorKey)}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          background: THEME_COLORS[colorKey].accent,
-                          border: themeColor === colorKey ? '3px solid #fff' : '2px solid transparent',
-                          boxShadow: themeColor === colorKey ? `0 0 10px ${THEME_COLORS[colorKey].accent}` : 'none',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                        title={colorKey.toUpperCase()}
-                      />
-                    ))}
+                    {Object.keys(THEME_COLORS).map(colorKey => {
+                      const activeColors = lightMode ? LIGHT_THEME_COLORS : THEME_COLORS;
+                      return (
+                        <button
+                          key={colorKey}
+                          onClick={() => setThemeColor(colorKey)}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: activeColors[colorKey].accent,
+                            border: themeColor === colorKey ? '3px solid #fff' : '2px solid transparent',
+                            boxShadow: themeColor === colorKey ? `0 0 10px ${activeColors[colorKey].accent}` : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                          title={colorKey.toUpperCase()}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
