@@ -208,6 +208,32 @@ export default function Dashboard({ session, onSignOut }) {
     }
   };
 
+  const handleRemoveChatPin = async (chatId) => {
+    if (!confirm("Are you sure you want to remove the security PIN lock from this mission log?")) return;
+    try {
+      const { error } = await supabase
+        .from('chats')
+        .update({
+          is_encrypted: false,
+          encryption_pin: null
+        })
+        .eq('id', chatId);
+
+      if (error) throw error;
+
+      setChats(prev => prev.map(c => c.id === chatId ? { ...c, is_encrypted: false, encryption_pin: null } : c));
+      setUnlockedChats(prev => {
+        const next = new Set(prev);
+        next.delete(chatId);
+        return next;
+      });
+      if (soundEnabled) playChirp();
+    } catch (err) {
+      console.error("Error removing chat PIN:", err);
+      alert("Failed to remove encryption PIN: " + err.message);
+    }
+  };
+
   const handleToggleCombatMode = () => {
     const newState = !combatMode;
     setCombatMode(newState);
@@ -1317,10 +1343,14 @@ export default function Dashboard({ session, onSignOut }) {
             {activeChatId && (
               <button 
                 onClick={() => {
-                  setPinChatId(activeChatId);
-                  setPinMode(activeChat?.is_encrypted ? 'enter' : 'set');
-                  setPinValue('');
-                  setPinModalActive(true);
+                  if (activeChat?.is_encrypted) {
+                    handleRemoveChatPin(activeChatId);
+                  } else {
+                    setPinChatId(activeChatId);
+                    setPinMode('set');
+                    setPinValue('');
+                    setPinModalActive(true);
+                  }
                 }}
                 style={{
                   background: 'none',
@@ -1336,7 +1366,7 @@ export default function Dashboard({ session, onSignOut }) {
                   borderRadius: '4px',
                   border: '1px solid rgba(255,255,255,0.05)'
                 }}
-                title={activeChat?.is_encrypted ? "Chat is PIN Protected" : "Encrypt this chat with a PIN"}
+                title={activeChat?.is_encrypted ? "Unlock / Remove PIN Protection" : "Encrypt this chat with a PIN"}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
