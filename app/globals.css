@@ -1207,3 +1207,65 @@ body {
   font-weight: 700;
 }
 
+/* Light Theme Variables Overrides */
+:root.light-theme {
+  --bg-app: #f4f6f9;
+  --bg-sidebar: #eaecf0;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --bg-bubble-ai: rgba(255, 255, 255, 0.7);
+  
+  --border-glass: rgba(0, 0, 0, 0.08);
+  --border-glow: rgba(0, 0, 0, 0.08);
+  
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+}
+
+/* Specific styling modifications for Light Theme */
+.light-theme .welcome-screen h1 {
+  background: linear-gradient(135deg, #111827 0%, var(--accent-yellow) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.light-theme .suggestion-card {
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+.light-theme .suggestion-card:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: var(--accent-yellow) !important;
+}
+.light-theme .bubble {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+.light-theme .messages-container {
+  background: #fdfdfd;
+}
+.light-theme textarea {
+  color: #111827 !important;
+}
+.light-theme .modal {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+.light-theme .modal-header h2 {
+  color: #111827;
+}
+.light-theme .form-group input, 
+.light-theme .form-group textarea, 
+.light-theme .form-group select {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+.light-theme .tactical-panel {
+  background: #eaecf0;
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+}
+.light-theme .tactical-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+

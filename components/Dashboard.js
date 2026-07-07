@@ -78,6 +78,7 @@ export default function Dashboard({ session, onSignOut }) {
   const [maxTokens, setMaxTokens] = useState(1000);
   const [matrixRainEnabled, setMatrixRainEnabled] = useState(false);
   const [personaPreset, setPersonaPreset] = useState('default');
+  const [lightMode, setLightMode] = useState(false);
 
   // Streaming State (For real-time UI accumulation)
   const [streamContent, setStreamContent] = useState('');
@@ -123,6 +124,7 @@ export default function Dashboard({ session, onSignOut }) {
         if (data.max_tokens) setMaxTokens(data.max_tokens);
         if (data.matrix_rain !== undefined && data.matrix_rain !== null) setMatrixRainEnabled(data.matrix_rain);
         if (data.persona_preset) setPersonaPreset(data.persona_preset);
+        if (data.light_mode !== undefined && data.light_mode !== null) setLightMode(data.light_mode);
       }
     } catch (err) {
       console.error("Error fetching profile details:", err);
@@ -369,6 +371,16 @@ export default function Dashboard({ session, onSignOut }) {
       applyThemeColor(themeColor);
     }
   }, [themeColor, combatMode]);
+
+  // Set light theme html class
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (lightMode) {
+      document.documentElement.classList.add('light-theme');
+    } else {
+      document.documentElement.classList.remove('light-theme');
+    }
+  }, [lightMode]);
 
   // Matrix digital rain backdrop animations
   useEffect(() => {
@@ -748,7 +760,8 @@ export default function Dashboard({ session, onSignOut }) {
           theme_color: themeColor,
           max_tokens: maxTokens,
           matrix_rain: matrixRainEnabled,
-          persona_preset: personaPreset
+          persona_preset: personaPreset,
+          light_mode: lightMode
         })
         .eq('id', currentUser.id);
 
@@ -1983,6 +1996,44 @@ export default function Dashboard({ session, onSignOut }) {
                         title={colorKey.toUpperCase()}
                       />
                     ))}
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '1rem', marginTop: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Visual Mode</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      onClick={() => setLightMode(false)}
+                      style={{
+                        background: !lightMode ? 'rgba(255,204,0,0.15)' : 'rgba(0,0,0,0.2)',
+                        border: !lightMode ? '1px solid var(--accent-yellow)' : '1px solid var(--border-glass)',
+                        borderRadius: '6px',
+                        color: !lightMode ? 'var(--accent-yellow)' : 'var(--text-secondary)',
+                        padding: '0.4rem 0.8rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        flex: 1
+                      }}
+                    >
+                      🌑 Dark Mode
+                    </button>
+                    <button
+                      onClick={() => setLightMode(true)}
+                      style={{
+                        background: lightMode ? 'rgba(255,204,0,0.15)' : 'rgba(0,0,0,0.2)',
+                        border: lightMode ? '1px solid var(--accent-yellow)' : '1px solid var(--border-glass)',
+                        borderRadius: '6px',
+                        color: lightMode ? 'var(--accent-yellow)' : 'var(--text-secondary)',
+                        padding: '0.4rem 0.8rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        flex: 1
+                      }}
+                    >
+                      ☀️ Light Mode
+                    </button>
                   </div>
                 </div>
 

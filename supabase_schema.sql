@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     max_tokens INTEGER DEFAULT 1000,
     matrix_rain BOOLEAN DEFAULT false,
     persona_preset TEXT DEFAULT 'default',
+    light_mode BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -121,6 +122,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS theme_color TEXT DEFAULT 'g
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS max_tokens INTEGER DEFAULT 1000;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS matrix_rain BOOLEAN DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS persona_preset TEXT DEFAULT 'default';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS light_mode BOOLEAN DEFAULT false;
 
 -- Public sharing access policies
 CREATE POLICY "Anyone can view shared chats" 
